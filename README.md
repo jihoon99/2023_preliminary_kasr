@@ -74,3 +74,53 @@ $ nova submit [세션명] [모델_checkpoint_번호]
 본 베이스라인 코드는 김수환 님께서 개발해 공개하신 kospeech (https://github.com/sooftware/kospeech) 를 기반으로 하였으
 며
 nova 플랫폼에서 사용 가능한 형태로 수정하였습니다.
+
+# Additional Tips (JH)
+
+## 1. ABOUT NOVA
+
+- NOVA 는 일종의 application이다. e.g) anaconda
+
+## 2. Nova On Terminal
+
+- $nova --help
+- 터미널 상에서 위 코드를 작성하면 아래와 같은 아웃풋이 나옴
+
+```
+Options:
+  --version                  Show the version and exit.
+  -enc, --encrypt TEXT
+  --buffered / --unbuffered
+  -u, --username TEXT        User name
+  --help                     Show this message and exit.
+
+Commands:
+  logs    Session Logs
+  model   Command group for model
+  ps      List of sessions
+  rm      Remove sessions
+  run     Run Training session
+  status  Print Resources
+  stop    Stop session
+  submit  Submit checkpoint
+```
+
+## 3. Example
+
+- root@9b7809a82e56:~/baseline/jh# nova run -d Tr2KB -e main.py 제가 임의로 한번 실행했습니다. main.py안에는 print 문만 있습니다.
+  > 새로운 세션이 생김
+- nova ps 현재 생성된 세션을 볼 수 있음.
+
+```
+---------------------
+Name                Created          Args    Status     Summary    Description    # of Models    Size    Type
+------------------  ---------------  ------  ---------  ---------  -------------  -------------  ------  ------
+jihoonjung/Tr2KB/1  Not created yet          Allocated                            0              63 B    normal
+```
+
+- root@9b7809a82e56:~/baseline/jh# nova rm jihoonjung/Tr2KB/1
+
+```
+[Warn] jihoonjung/Tr2KB/1 is already removed.
+Done
+```
