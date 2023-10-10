@@ -1,3 +1,14 @@
+from typing import Tuple
+import math
+
+import torch
+from torch import Tensor
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.nn.init as init
+
+from astropy.modeling import ParameterError
+
 from modules.vocab import Vocabulary
 
 
@@ -429,6 +440,7 @@ class DeepSpeech2(EncoderModel):
         bidirectional (bool, optional): if True, becomes a bidirectional encoder (defulat: True)
         activation (str): type of activation function (default: hardtanh)
         device (torch.device): device - 'cuda' or 'cpu'
+
     Inputs: inputs, input_lengths
         - **inputs**: list of sequences, whose length is the batch size and within which each sequence is list of tokens
         - **input_lengths**: list of sequence lengths
@@ -526,7 +538,8 @@ def build_deepspeech2(
         bidirectional=bidirectional,
         activation=activation,
         device=device,
-    )).to(device)
+    )).to(device) # multi gpu 사용함.
+
 
 def build_model(
         config,

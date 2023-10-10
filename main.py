@@ -81,8 +81,6 @@ if __name__ == '__main__':
     args.add_argument('--mode', type=str, default='train')
     args.add_argument('--iteration', type=str, default='0')
     args.add_argument('--pause', type=int, default=0)
-
-
     # Parameters 
     args.add_argument('--use_cuda', type=bool, default=True)
     args.add_argument('--seed', type=int, default=777)
@@ -158,14 +156,14 @@ if __name__ == '__main__':
 
     if config.mode == 'train':
 
-        config.dataset_path = os.path.join(DATASET_PATH, 'train', 'train_data')
-        label_path = os.path.join(DATASET_PATH, 'train', 'train_label')
-        preprocessing(label_path, os.getcwd())
+        config.dataset_path = os.path.join(DATASET_PATH, 'train', 'train_data') # 트레이닝 데이터 셋 위치 
+        label_path = os.path.join(DATASET_PATH, 'train', 'train_label')         # 정답지 위치 : train_label이 csv인가 봅니다. -> columns : audio_path, transcript(sentence)
+        preprocessing(label_path, os.getcwd()) # current_path/label.csv 가 존재합니다. (git에도 제가 일부를 올렸음.)
         train_dataset, valid_dataset = split_dataset(config, os.path.join(os.getcwd(), 'transcripts.txt'), vocab)
 
-        lr_scheduler = get_lr_scheduler(config, optimizer, len(train_dataset))
+        lr_scheduler = get_lr_scheduler(config, optimizer, len(train_dataset)) # learning scheduler 적용했네.
         optimizer = Optimizer(optimizer, lr_scheduler, int(len(train_dataset)*config.num_epochs), config.max_grad_norm)
-        criterion = get_criterion(config, vocab)
+        criterion = get_criterion(config, vocab) # CTC loss
 
         num_epochs = config.num_epochs
         num_workers = config.num_workers
@@ -181,7 +179,7 @@ if __name__ == '__main__':
                 train_dataset,
                 batch_size=config.batch_size,
                 shuffle=True,
-                collate_fn=collate_fn,
+                collate_fn=collate_fn,            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
                 num_workers=config.num_workers
             )
 

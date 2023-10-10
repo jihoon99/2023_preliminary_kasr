@@ -101,6 +101,24 @@ def sentence_to_target(sentence, char2id):
 
 
 def generate_character_script(data_df, labels_dest):
+    '''
+        JH
+            data_df : 컬럼들은 아래와 같음.
+                audio_path, transcript
+        
+            labels_dest :  csv파일임.
+                컬럼명 : id, char, freq
+                예)
+                    3, 정, 397     -> 정 이라는 글자가 397번 나오고, '정' -> 3번이라고 encoding함.
+
+        결과물 : transcripts.txt라는 파일에
+
+        audio  sentence  encoded
+        주소    잘하자      199 5379 60172   
+
+        이런식으로 변환함.
+    
+    '''
     print('[INFO] create_script started..')
     char2id, id2char = load_label(os.path.join(labels_dest, "labels.csv"))
 

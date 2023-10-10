@@ -15,7 +15,7 @@ def trainer(mode, config, dataloader, optimizer, model, criterion, metric, train
     print(f'[INFO] {mode} Start')
     epoch_begin_time = time.time()
     cnt = 0
-    for inputs, targets, input_lengths, target_lengths in dataloader:
+    for inputs, targets, input_lengths, target_lengths in dataloader: # input_lengths : audio seq length, target_length : token length
         begin_time = time.time()
 
         optimizer.zero_grad()

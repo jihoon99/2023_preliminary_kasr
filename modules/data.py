@@ -45,35 +45,50 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             audio_extension: str = 'pcm'  # audio extension
     ) -> None:
         super(SpectrogramDataset, self).__init__(
-            feature_extract_by=config.feature_extract_by, sample_rate=config.sample_rate,
-            n_mels=config.n_mels, frame_length=config.frame_length, frame_shift=config.frame_shift,
-            del_silence=config.del_silence, input_reverse=config.input_reverse,
-            normalize=config.normalize, freq_mask_para=config.freq_mask_para,
-            time_mask_num=config.time_mask_num, freq_mask_num=config.freq_mask_num,
-            sos_id=sos_id, eos_id=eos_id, dataset_path=dataset_path, transform_method=config.transform_method,
+            feature_extract_by=config.feature_extract_by, 
+            sample_rate=config.sample_rate,
+            n_mels=config.n_mels, 
+            frame_length=config.frame_length, 
+            frame_shift=config.frame_shift,
+            del_silence=config.del_silence, 
+            input_reverse=config.input_reverse,
+            normalize=config.normalize, 
+            freq_mask_para=config.freq_mask_para,
+            time_mask_num=config.time_mask_num, 
+            freq_mask_num=config.freq_mask_num,
+            sos_id=sos_id, 
+            eos_id=eos_id, 
+            dataset_path=dataset_path,  # config.dataset_path
+            transform_method=config.transform_method,
             audio_extension=audio_extension
         )
         self.audio_paths = list(audio_paths)
         self.transcripts = list(transcripts)
 
-        self.augment_methods = [self.VANILLA] * len(self.audio_paths)
-        self.dataset_size = len(self.audio_paths)
-        self._augment(spec_augment)
-        self.shuffle()
+        self.augment_methods = [self.VANILLA] * len(self.audio_paths) # self.VANILA : agument 안함.
+        self.dataset_size = len(self.audio_paths) # 데이터 갯수
+        self._augment(spec_augment) # 증강방법은 나ㅇ에.
+        self.shuffle() # -> 또 섞어? DataLoader에 shuffle 파라미어 있는데,,, 
 
     def __getitem__(self, idx):
         """ get feature vector & transcript """
-        feature = self.parse_audio(os.path.join(self.dataset_path, self.audio_paths[idx]), self.augment_methods[idx])
+        feature = self.parse_audio(os.path.join(self.dataset_path, self.audio_paths[idx]), self.augment_methods[idx]) # 해당하는 오디오를 불러옴.
+        # 더 들어가면 modules/audio/core에서 load하는 메서드가 있는데, silence remove 하는 부분의 로직이 빈약함. -> 예선전 알고리즘으로 고도화 가능
 
         if feature is None:
             return None
 
         transcript, status = self.parse_transcript(self.transcripts[idx])
+        # self.transcripts[idx] : 2345 1353 1 3817 2038  이렇게 생겼음. 토큰 단위로 잘라줘야함.
+        # sos, eos 토큰 앞뒤로 붙여줌.
 
         if status == 'err':
             print(self.transcripts[idx])
             print(idx)
-        return feature, transcript
+        return feature, transcript # feature : spectogram audio, trasncript : list contain tokens
+        # feature  부분 shape 더 살펴봐야함
+        # wave2vec2.0 pretrained version 사용해서 고도화 가능
+        # 다만 데이터가 pretrain하기 충분한 양인지는 모르겠음.
 
     def parse_transcript(self, transcript):
         """ Parses transcript """
@@ -135,6 +150,29 @@ def parse_audio(audio_path: str, del_silence: bool = False, audio_extension: str
 
 def load_dataset(transcripts_path):
     """
+    JH :
+    ---------------------------
+        transcripts_path : txt같은 파일임.
+            audio_path, sentence, encoded_sentence 가 한줄 한줄 들어있음.
+
+
+        한줄씩 불러와서
+            audio_path, korean_transcript, transcript라고  오브젝트 할당함.
+
+            
+
+        return
+            audio_paths : [file1, file2, file3, ...]
+            transcripts : [
+                            [1,2,3,...],
+                            [103,1853,20183, ...],
+                            [5729,10385,20381, ...]
+                        ]
+            
+
+
+    ----------------------------
+
     Provides dictionary of filename and labels
 
     Args:
@@ -157,7 +195,7 @@ def load_dataset(transcripts_path):
             audio_paths.append(audio_path)
             transcripts.append(transcript)
 
-    return audio_paths, transcripts
+    return audio_paths, transcripts # 이것들 다 list 임.
 
 
 def split_dataset(config, transcripts_path: str, vocab: Vocabulary, valid_size=.2):
@@ -179,11 +217,12 @@ def split_dataset(config, transcripts_path: str, vocab: Vocabulary, valid_size=.
     trainset_list = list()
     validset_list = list()
 
-    audio_paths, transcripts = load_dataset(transcripts_path)
+    audio_paths, transcripts = load_dataset(transcripts_path) # 리스트를 아웃풋으로 내뱉음.
+    # 오디오 위치, 인코딩된 문장
 
     train_audio_paths, valid_audio_paths, train_transcripts, valid_transcripts = train_test_split(audio_paths,
                                                                                                   transcripts,
-                                                                                                  test_size=valid_size)
+                                                                                                  test_size=valid_size) # sklearn train_test_split임.
 
 
     # audio_paths & script_paths shuffled in the same order
