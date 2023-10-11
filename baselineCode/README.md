@@ -75,6 +75,8 @@ $ nova submit [세션명] [모델_checkpoint_번호]
 며
 nova 플랫폼에서 사용 가능한 형태로 수정하였습니다.
 
+---
+
 # Additional Tips (JH)
 
 ## 1. ABOUT NOVA
@@ -123,4 +125,32 @@ jihoonjung/Tr2KB/1  Not created yet          Allocated                          
 ```
 [Warn] jihoonjung/Tr2KB/1 is already removed.
 Done
+```
+
+## 4. log 기록 살펴보기
+
+- something.py code
+
+```
+print(1)
+print(2)
+```
+
+- 터미널에서 다음과 같이 노바 실행
+
+```
+$ nova run -d Tr2KB -e main.py
+
+$ root@9b7809a82e56:~# nova ps
+---------------------
+Name                 Created          Args    Status     Summary    Description    # of Models    Size    Type
+-------------------  ---------------  ------  ---------  ---------  -------------  -------------  ------  ------
+jihoonjung/Tr2KB/13  Not created yet          Allocated                            0              629 B   normal
+
+$ root@9b7809a82e56:~/baseline/jh# nova logs -f jihoonjung/Tr2KB/13
+---------------------
+1
+2
+User session exited
+
 ```
