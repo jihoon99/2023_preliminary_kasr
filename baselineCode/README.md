@@ -129,9 +129,11 @@ Done
 
 ## 4. log 기록 살펴보기
 
-- something.py code
+- main.py code
 
 ```
+# main.py
+
 print(1)
 print(2)
 ```
