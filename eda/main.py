@@ -54,6 +54,6 @@ print(read_label_csv.iloc[-1]['text'])
 from core import load_audio
 dataset_path
 
-read_label_csv['filename'] = dataset_path + read_label_csv['filename']
+read_label_csv['filename'] = dataset_path + '/' + read_label_csv['filename']
 read_label_csv['len_wav'] = read_label_csv['filename'].apply(lambda x: load_audio(x, False, x.split(".")[-1]))
 print(read_label_csv.head())
