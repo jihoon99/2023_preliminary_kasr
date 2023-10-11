@@ -156,3 +156,14 @@ $ root@9b7809a82e56:~/baseline/jh# nova logs -f jihoonjung/Tr2KB/13
 User session exited
 
 ```
+
+## 5. move local file to server by scp
+
+```
+$ scp [옮기고자하는 로컬파일 이름] id@serverIP:path
+
+$ scp ./eda/core.py kaic2023@101.101.209.54:~/
+
+kaic2023@101.101.209.54's password:
+
+```
