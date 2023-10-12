@@ -110,6 +110,12 @@ short_df = read_label_csv[read_label_csv['text_len'] == 1]
 print(short_df['text'].unique())
 print(f'len of data : {len(short_df)}')
 
+print('groupby text_len nunique')
+print(read_label_csv.groupby("text_len")[['text']].nunique())
+
+print('groupby text_len count')
+print(read_label_csv.groupby("text_len")[['text']].count())
+
 
 end = datetime.datetime.now()
 print('duration time :', end-start)
