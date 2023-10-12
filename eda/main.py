@@ -4,6 +4,10 @@ import pandas as pd
 import nova
 from nova import DATASET_PATH
 
+import datetime
+
+start = datetime.datetime.now()
+
 ######################################################################
 #                       1. 1st eda                                  #
 ######################################################################
@@ -49,11 +53,40 @@ print(read_label_csv.iloc[-1]['text'])
 
 
 ######################################################################
-#                       2. 3rd eda                                  #
+#                       3. 3rd eda                                  #
 ######################################################################
+print("-"*100)
+print("3rd started")
+
 from core import load_audio
 dataset_path
 
 read_label_csv['filename'] = dataset_path + '/' + read_label_csv['filename']
-read_label_csv['len_wav'] = read_label_csv['filename'].apply(lambda x: load_audio(x, False, x.split(".")[-1]))
+read_label_csv['len_wav'] = read_label_csv['filename'].apply(lambda x: load_audio(x, False, x.split(".")[-1]).shape[0])
 print(read_label_csv.head())
+print("-"*100)
+check_transform_type = load_audio(read_label_csv['filename'].iloc[0], False, 'wav')
+print('check_data_format')
+print("-"*100)
+print(check_transform_type)
+print(check_transform_type.shape)
+
+print('.95 : ', '-'*80)
+print(read_label_csv.iloc[int(csv_len*0.95)])
+
+print('.99 : ', '-'*80)
+print(read_label_csv.iloc[int(csv_len*0.99)])
+
+print('1. : ', '-'*80)
+print(read_label_csv.iloc[-1])
+
+print("-"*100)
+print("sum len wav : ")
+print(read_label_csv['len_wav'].sum())
+
+
+
+
+
+end = datetime.datetime.now()
+print('duration time :', end-start)

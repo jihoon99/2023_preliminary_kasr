@@ -58,7 +58,6 @@ columns : filename, text
 
 ```
 
-
 # 2. 2nd eda
 
 ```
@@ -79,3 +78,26 @@ text_len                                                  297
  네 안녕하세요. 대출 해피 대출 맞죠? 대출에 대해서 좀 여쭤보려고요. 제가 대출을 하 어떻게 하는지를 하나도 몰라서요. 대충 대출 심사 기준이 있다는데 제가 신용점수도 칠백 오십으로 나쁘지 않은 점수를 가지고 있고 기존에 대출도 지금 하나도 없는 상태입니다. 그런데 요즘 경제가 어렵다 보니 목돈 마련이 좀 필요할 것 같아서요. 주위 사람들 다 빚져서라도 주식 투자하고 막 그러던데 저도 해야 그래야 하는 건지 걱정이 많네요. 그래도 아무 데서나 대출받을 수는 없다고 생각해서 해피 대출에 전화하게 되었습니다. 상담 가능할까요?
 
 ```
+
+# 3. 3rd eda
+
+- len_wav is calculated
+
+```
+                                           filename text  text_len  len_wav
+38047   /data/Tr2KB/train/train_data/idx_038047.wav              1    22697
+38036   /data/Tr2KB/train/train_data/idx_038036.wav              1    20051
+176620  /data/Tr2KB/train/train_data/idx_176620.wav    다         1     9439
+101348  /data/Tr2KB/train/train_data/idx_101348.wav              1    25919
+53171   /data/Tr2KB/train/train_data/idx_053171.wav              1    21675
+```
+
+- check_data_format
+
+```
+1d array
+
+[0.00097659 0.00091556 0.00085452 ... 0.00012207 0.00024415 0.00036622]
+```
+
+- calculation duration : 1h 30min(너무 오래 걸리네.)
