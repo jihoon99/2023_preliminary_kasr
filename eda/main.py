@@ -63,7 +63,7 @@ from core import load_audio
 dataset_path
 
 read_label_csv['filename'] = dataset_path + '/' + read_label_csv['filename']
-read_label_csv['len_wav'] = read_label_csv['filename'].apply(lambda x: load_audio(x, False, x.split(".")[-1]).shape[0])
+# read_label_csv['len_wav'] = read_label_csv['filename'].apply(lambda x: load_audio(x, False, x.split(".")[-1]).shape[0])
 print(read_label_csv.head())
 print("-"*100)
 check_transform_type = load_audio(read_label_csv['filename'].iloc[0], False, 'wav')
@@ -83,9 +83,32 @@ print(read_label_csv.iloc[-1])
 
 print("-"*100)
 print("sum len wav : ")
-print(read_label_csv['len_wav'].sum())
+# print(read_label_csv['len_wav'].sum())
 
 
+#############################################################
+#                   4. 4rd eda                              #
+#############################################################
+
+print("text len 4", "-"*100)
+short_df = read_label_csv[read_label_csv['text_len'] == 4]
+print(short_df['text'].unique())
+print(f'len of data : {len(short_df)}')
+
+print("text len 3", "-"*100)
+short_df = read_label_csv[read_label_csv['text_len'] == 3]
+print(short_df['text'].unique())
+print(f'len of data : {len(short_df)}')
+
+print("text len 2", "-"*100)
+short_df = read_label_csv[read_label_csv['text_len'] == 2]
+print(short_df['text'].unique())
+print(f'len of data : {len(short_df)}')
+
+print("text len 1", "-"*100)
+short_df = read_label_csv[read_label_csv['text_len'] == 1]
+print(short_df['text'].unique())
+print(f'len of data : {len(short_df)}')
 
 
 end = datetime.datetime.now()
