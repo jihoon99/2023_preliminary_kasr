@@ -50,7 +50,8 @@ print('1. : ', '-'*80)
 print(read_label_csv.iloc[-1])
 print(read_label_csv.iloc[-1]['text'])
 
-
+print("-"*100)
+print(read_label_csv[read_label_csv['text_len'] < 5])
 
 ######################################################################
 #                       3. 3rd eda                                  #
@@ -83,7 +84,6 @@ print(read_label_csv.iloc[-1])
 print("-"*100)
 print("sum len wav : ")
 print(read_label_csv['len_wav'].sum())
-
 
 
 
