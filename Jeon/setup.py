@@ -2,12 +2,11 @@
 from distutils.core import setup
 
 setup(
-    name='kospeech_nova',
+    name='koreanAI2023',
     version='latest',
     install_requires=[
         # 'torch==1.7.0',
         # 'levenshtein',
-        'glob2',
         'librosa >= 0.7.0',
         'numpy',
         'pandas',
@@ -17,5 +16,7 @@ setup(
         'sentencepiece',
         'torchaudio==0.6.0',
         'pydub',
+        'glob2'
     ],
 )
+

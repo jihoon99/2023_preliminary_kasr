@@ -8,7 +8,7 @@ from torch import Tensor
 
 from modules.vocab import KoreanSpeechVocabulary
 from modules.data import load_audio
-from JeonRaDoSikDang.modules.model.deepspeech2 import DeepSpeech2
+from modules.model.deepspeech2 import DeepSpeech2
 
 
 def parse_audio(audio_path: str, del_silence: bool = False, audio_extension: str = 'pcm') -> Tensor:
