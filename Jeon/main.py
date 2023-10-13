@@ -40,8 +40,8 @@ import nova
 from nova import DATASET_PATH
 
 
-from dotenv import load_dotenv # read '.env' file
-load_dotenv()
+#from dotenv import load_dotenv # read '.env' file
+#load_dotenv()
 
 
 
@@ -129,6 +129,7 @@ def build_model(
             device        = device,
         )
 
+
     return model
 
 
@@ -177,9 +178,12 @@ if __name__ == '__main__':
     args.add_argument('--num_workers', type=int, default=16)
     args.add_argument('--num_threads', type=int, default=16)
     
+    # optimizer
+    args.add_argument('--optimizer', type=str, default='adam')      
+
     # Optimizer lr scheduler options
-    args.add_argument("--constant_lr", default=5e-5)  # when this is False:   아래의 옵션들이 실행됨.
-    args.add_argument('--use_lr_scheduler', type=bool, default=False)
+    args.add_argument("--constant_lr", default=False) #default=5e-5)  # when this is False:   아래의 옵션들이 실행됨.
+    args.add_argument('--use_lr_scheduler', type=bool, default=False) ## 지워?
     args.add_argument('--lr_scheduler', type=str, default='tri_stage_lr_scheduler')
     args.add_argument('--init_lr', type=float, default=1e-06)
     args.add_argument('--final_lr', type=float, default=1e-06)
@@ -188,9 +192,6 @@ if __name__ == '__main__':
     args.add_argument('--final_lr_scale', type=float, default=5e-02)
     args.add_argument('--warmup_steps', type=int, default=1000)
     args.add_argument('--weight_decay', type=float, default=1e-05)
-
-    # optimizer
-    args.add_argument('--optimizer', type=str, default='adam')       
 
     # explode 예방
     args.add_argument('--max_grad_norm', type=int, default=400)
@@ -236,7 +237,7 @@ if __name__ == '__main__':
         sos_id = '<s>',
         eos_id = '</s>',
         pad_id = '[pad]',
-        blank_id = '<blank>',
+        # blank_id = '<blank>',
         # unk_id = '[unk]'
     )
 
@@ -271,7 +272,7 @@ if __name__ == '__main__':
         train_dataset, valid_dataset = split_dataset(config, os.path.join(os.getcwd(), 'transcripts.txt'), vocab) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
 
         # lr 스케쥴 적용한 것과 아닌것.
-        if config.constant_lr == False:
+        if config.use_lr_scheduler:
             lr_scheduler = get_lr_scheduler(config, optimizer, len(train_dataset)) # learning scheduler 적용했네.
             optimizer = Optimizer(optimizer, lr_scheduler, int(len(train_dataset)*config.num_epochs), config.max_grad_norm)
 

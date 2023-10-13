@@ -220,6 +220,10 @@ def split_dataset(config, transcripts_path: str, vocab: Vocabulary, valid_size=.
     audio_paths, transcripts = load_dataset(transcripts_path) # 리스트를 아웃풋으로 내뱉음.
     # 오디오 위치, 인코딩된 문장
 
+    if config.version == 'PoC':
+        audio_paths = audio_paths[:1000]
+        transcripts = transcripts[:1000]
+        
     train_audio_paths, valid_audio_paths, train_transcripts, valid_transcripts = train_test_split(audio_paths,
                                                                                                   transcripts,
                                                                                                   test_size=valid_size) # sklearn train_test_split임.

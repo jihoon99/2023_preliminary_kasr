@@ -33,7 +33,9 @@ class KoreanSpeechVocabulary(Vocabulary):
         vocab_df['char'][vocab_df['char'] == '<sos>'] = sos_id
         vocab_df['char'][vocab_df['char'] == '<eos>'] = eos_id
         vocab_df['char'][vocab_df['char'] == '<pad>'] = pad_id
-        vocab_df['char'][vocab_df['char'] == '<blank>'] = blank_id
+        self.blank = blank_id
+        # vocab_df['char'][vocab_df['char'] == '<blank>'] = blank_id # load_vocab에서 black를 만드네
+
         # try:
         #     vocab_df['char'][vocab_df['char'] == '[unk]'] = unk_id
         # except:
@@ -113,8 +115,8 @@ class KoreanSpeechVocabulary(Vocabulary):
                     unit2id[row[1]] = row[0]
                     id2unit[int(row[0])] = row[1]
 
-                unit2id[self.blank_id] = len(unit2id)
-                id2unit[len(unit2id)] = self.blank_id
+                unit2id[self.blank] = len(unit2id)
+                id2unit[len(unit2id)] = self.blank
 
             return unit2id, id2unit
         except IOError:

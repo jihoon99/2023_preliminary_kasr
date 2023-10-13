@@ -170,6 +170,7 @@ def get_lr_scheduler(config, optimizer, epoch_time_step) -> LearningRateSchedule
 def get_optimizer(model: nn.Module, config):
     supported_optimizer = {
         'adam': optim.Adam,
+        # 'Radam' : optim.RAdam,  # custom.optim.RAdam 으로 바꿔야함.
     }
 
     return supported_optimizer[config.optimizer](
@@ -177,7 +178,6 @@ def get_optimizer(model: nn.Module, config):
         lr=config.init_lr,
         weight_decay=config.weight_decay,
     )
-
 
 def get_criterion(config, vocab: Vocabulary) -> nn.Module:
 
