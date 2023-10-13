@@ -20,8 +20,47 @@ import pydub
 from astropy.modeling import ParameterError
 from numpy.lib.stride_tricks import as_strided
 
+from noisereduce import reduce_noise
 
-def load_audio(audio_path: str, del_silence: bool = False, extension: str = 'pcm') -> np.ndarray:
+
+def remove_noise(np_wav, ratio=16_000):
+    return reduce_noise(y = np_wav, sr=ratio, stationary=False)
+
+
+def detect_silence(pcm, audio_threshold = 0.0075, min_silence_len = 3, ratio=16000, make_silence_len=1):
+    if len(pcm) < min_silence_len*ratio:
+        return []
+    
+    b = np.where((abs(pcm) > audio_threshold) == True)[0] # 소리가 나는 부분
+    c = np.concatenate(([0], b[:-1]), axis=0)
+
+    starts = c[(b-c)>min_silence_len*ratio]               # 소리가 안나는 부분 시작
+    ends = b[(b-c)>min_silence_len*ratio]
+
+    if len(ends) == 0:
+        return pcm
+    else:
+        non_masking = np.array([True]*len(pcm))
+        for (s,e) in zip(starts, ends):
+            non_masking[s:e+1] = False
+            non_masking[e-make_silence_len*ratio:e+1] = True
+        
+        return pcm[non_masking]
+
+    # answer = []
+    # for (s,e) in zip(starts, ends):
+    #     answer += [{'beg':s/ratio, 'end':e/ratio}]
+    # return answer
+
+
+def load_audio(audio_path: str,
+               del_silence: bool = False, 
+               extension: str = 'pcm', 
+               remove_noise=True,
+               audio_threshold=0.0075,
+               min_silence_len=3,
+               ratio=16000,
+               make_silence_len=1) -> np.ndarray:
     """
     Load audio file (PCM) to sound. if del_silence is True, Eliminate all sounds below 30dB.
     If exception occurs in numpy.memmap(), return None.
@@ -29,29 +68,60 @@ def load_audio(audio_path: str, del_silence: bool = False, extension: str = 'pcm
     try:
         if extension == 'pcm':
             signal = np.memmap(audio_path, dtype='h', mode='r').astype('float32')
+            signal_normalized = signal/32767
 
+            if remove_noise:
+                signal_normalized = remove_noise(
+                    signal_normalized, 
+                    ratio = ratio)
+                
             if del_silence:
-                non_silence_indices = split(signal, top_db=30)
-                signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])
+                signal_normalized = detect_silence(
+                    signal_normalized,
+                    audio_threshold=audio_threshold,
+                    min_silence_len=min_silence_len,
+                    ratio = ratio,
+                    make_silence_len=make_silence_len
+                    )
 
-            if sum(abs(signal)) <= 80:
+            # if del_silence:
+            #     non_silence_indices = split(signal, top_db=30)
+            #     signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])
+
+            if sum(abs(signal_normalized)) <= 80:
                 raise ValueError('[WARN] Silence file in {0}'.format(audio_path))
 
-            return signal / 32767  # normalize audio
+            return signal_normalized / 32767  # normalize audio
 
         elif extension == 'wav':
             aud = pydub.AudioSegment.from_wav(audio_path)
             aud = aud.set_frame_rate(16000)
             signal = np.array(aud.get_array_of_samples()).astype('float32')
+            signal_normalized = signal/32767
 
+            if remove_noise:
+                signal_normalized = remove_noise(
+                    signal_normalized, 
+                    ratio = ratio)
+                
             if del_silence:
-                non_silence_indices = split(signal, top_db=30)
-                signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])
+                signal_normalized = detect_silence(
+                    signal_normalized,
+                    audio_threshold=audio_threshold,
+                    min_silence_len=min_silence_len,
+                    ratio = ratio,
+                    make_silence_len=make_silence_len
+                    )
 
-            if sum(abs(signal)) <= 80:
+            # if del_silence:
+            #     non_silence_indices = split(signal, top_db=30)
+            #     signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])
+
+
+            if sum(abs(signal_normalized)) <= 80:
                 raise ValueError('[WARN] Silence file in {0}'.format(audio_path))
 
-            return signal/32767
+            return signal_normalized/32767
 
     except ValueError:
         # print('ValueError in {0}'.format(audio_path))
@@ -297,3 +367,21 @@ def split(y, top_db=60, ref=np.max, frame_length=2048, hop_length=512):
 
     # Stack the results back as an ndarray
     return edges.reshape((-1, 2))
+
+
+if __name__ == '__main__':
+        aud = pydub.AudioSegment.from_wav('/Users/rainism/Desktop/2023_AI_hub/2023_preliminary_kasr/task2_03.wav')
+        aud = aud.set_frame_rate(16000)
+        print(aud)
+        signal = np.array(aud.get_array_of_samples()).astype('float32')
+        print(signal.shape)
+        print(signal)
+        
+        # if del_silence:
+        #     non_silence_indices = split(signal, top_db=30)
+        #     signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])
+
+        # if sum(abs(signal)) <= 80:
+        #     raise ValueError('[WARN] Silence file in {0}'.format(audio_path))
+
+        # return signal/32767
