@@ -9,7 +9,10 @@ import argparse
 from glob import glob
 
 from modules.preprocess import preprocessing
-from modules.trainer import trainer
+from modules.trainer import (
+    training,
+    validating,
+)
 from modules.utils import (
     get_optimizer,
     get_criterion,
@@ -116,7 +119,7 @@ def build_model(
 ) -> nn.DataParallel:
 
     if config.architecture == 'deepspeech2':
-
+        # 모델 안에 이미 멀티 지피유 사용함.
         model = build_deepspeech2(
             input_size    = input_size,
             num_classes   = len(vocab),
@@ -149,7 +152,7 @@ if __name__ == '__main__':
     args.add_argument('--use_cuda', type=bool, default=True)
     args.add_argument('--seed', type=int, default=777)
     args.add_argument('--num_epochs', type=int, default=5)
-    args.add_argument('--batch_size', type=int, default=128)
+    args.add_argument('--batch_size', type=int, default=64)
 
     args.add_argument('--save_result_every', type=int, default=2) # 2 
     args.add_argument('--checkpoint_every', type=int, default=1)  # save model every 
@@ -182,8 +185,8 @@ if __name__ == '__main__':
     args.add_argument('--optimizer', type=str, default='adam')      
 
     # Optimizer lr scheduler options
-    args.add_argument("--constant_lr", default=False) #default=5e-5)  # when this is False:   아래의 옵션들이 실행됨.
-    args.add_argument('--use_lr_scheduler', type=bool, default=False) ## 지워?
+    args.add_argument("--constant_lr", default=5e-5) #default=5e-5)  # when this is False:   아래의 옵션들이 실행됨.
+    args.add_argument('--use_lr_scheduler', type=bool, default=False) ## 
     args.add_argument('--lr_scheduler', type=str, default='tri_stage_lr_scheduler')
     args.add_argument('--init_lr', type=float, default=1e-06)
     args.add_argument('--final_lr', type=float, default=1e-06)
@@ -220,7 +223,7 @@ if __name__ == '__main__':
     warnings.filterwarnings('ignore')
 
     # seed
-    # random.seed(config.seed)
+    random.seed(config.seed)
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed_all(config.seed)
     
@@ -237,7 +240,7 @@ if __name__ == '__main__':
         sos_id = '<s>',
         eos_id = '</s>',
         pad_id = '[pad]',
-        # blank_id = '<blank>',
+        blank_id = '<blank>',
         # unk_id = '[unk]'
     )
 
@@ -258,7 +261,7 @@ if __name__ == '__main__':
     # load optimizer
     optimizer = get_optimizer(model, config)
     bind_model(model, optimizer=optimizer)
-    metric = get_metric(metric_name='CER', vocab=vocab) # this must be edit
+    metric = get_metric(metric_name='CER', vocab=vocab) #####################  다른 평가 지표 추가해야함.
 
     if config.pause:
         nova.paused(scope=locals())
@@ -270,6 +273,32 @@ if __name__ == '__main__':
 
         # config.version == 'PoC' 일 경우, 일부 데이터만 갖고 train_dataset, valid_datset 구성됨.
         train_dataset, valid_dataset = split_dataset(config, os.path.join(os.getcwd(), 'transcripts.txt'), vocab) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
+        
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            collate_fn=collate_fn,            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
+            num_workers=config.num_workers
+        )
+
+        valid_loader = DataLoader(
+            valid_dataset,
+            batch_size=config.batch_size,
+            shuffle=True,
+            collate_fn=collate_fn,
+            num_workers=config.num_workers
+        )
+
+        print("#"*100)
+        _seqs, _targets, _seq_lengths, _target_lengths = next(iter(train_loader))
+        print(f"TRAINING data shape")
+        print(f'TRAINING DATA : seqs : {_seqs.shape}')
+        print(f'TRAINING DATA : targets : {_targets.shape}')
+        print(f'TRAINING DATA : seq lengths : {_seq_lengths.shape}')
+        print(f'TRAINING DATA : target lengths : {_target_lengths.shape}')
+        print("#"*100)
+
 
         # lr 스케쥴 적용한 것과 아닌것.
         if config.use_lr_scheduler:
@@ -287,16 +316,7 @@ if __name__ == '__main__':
 
             # train
 
-            train_loader = DataLoader(
-                train_dataset,
-                batch_size=config.batch_size,
-                shuffle=True,
-                collate_fn=collate_fn,            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
-                num_workers=config.num_workers
-            )
-
-            model, train_loss, train_cer = trainer(
-                'train',
+            model, train_loss, train_cer = training(
                 config,
                 train_loader,
                 optimizer,
@@ -310,17 +330,7 @@ if __name__ == '__main__':
             print('[INFO] Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
 
             # valid
-
-            valid_loader = DataLoader(
-                valid_dataset,
-                batch_size=config.batch_size,
-                shuffle=True,
-                collate_fn=collate_fn,
-                num_workers=config.num_workers
-            )
-
-            model, valid_loss, valid_cer = trainer(
-                'valid',
+            model, valid_loss, valid_cer = validating(
                 config,
                 valid_loader,
                 optimizer,
