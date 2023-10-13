@@ -78,7 +78,7 @@ class SpectrogramParser(AudioParser):
             n_mels: int = 80,                         # Number of mfc coefficients to retain.
             frame_length: int = 20,                   # frame length for spectrogram
             frame_shift: int = 10,                    # Length of hop between STFT windows.
-            del_silence: bool = False,                # flag indication whether to delete silence or not
+            del_silence: bool = True,                # flag indication whether to delete silence or not
             input_reverse: bool = True,               # flag indication whether to reverse input or not
             normalize: bool = False,                  # flag indication whether to normalize spectrum or not
             transform_method: str = 'mel',            # which feature to use [mel, fbank, spect, mfcc]
@@ -110,7 +110,14 @@ class SpectrogramParser(AudioParser):
         else:
             raise ValueError("Unsupported feature : {0}".format(transform_method))
 
-    def parse_audio(self, audio_path: str, augment_method: int) -> Tensor:
+    def parse_audio(self, 
+                    audio_path: str, 
+                    augment_method: int, 
+                    remove_noise=True,
+                    audio_threshold=0.0075,
+                    min_silence_len=3,
+                    ratio=16_000,
+                    make_silence_len=1) -> Tensor:
         """
         Parses audio.
 
@@ -121,7 +128,15 @@ class SpectrogramParser(AudioParser):
         Returns: feature_vector
             - **feature_vector** (torch.FloatTensor): feature from audio file.
         """
-        signal = load_audio(audio_path, self.del_silence, extension=self.audio_extension)
+        signal = load_audio(
+            audio_path, 
+            self.del_silence, 
+            extension=self.audio_extension,
+            remove_noise=remove_noise,
+            audio_threshold=audio_threshold,
+            min_silence_len=min_silence_len,
+            ratio=ratio,
+            make_silence_len=make_silence_len)
 
         if signal is None:
             # print("Audio is None : {0}".format(audio_path))
@@ -134,13 +149,13 @@ class SpectrogramParser(AudioParser):
             feature /= np.std(feature)
 
         # Refer to "Sequence to Sequence Learning with Neural Network" paper
-        if self.input_reverse:
+        if self.input_reverse: #???????????????????????????????????????
             feature = feature[:, ::-1]
             feature = FloatTensor(np.ascontiguousarray(np.swapaxes(feature, 0, 1)))
         else:
             feature = FloatTensor(feature).transpose(0, 1)
 
-        if augment_method == SpectrogramParser.SPEC_AUGMENT:
+        if augment_method == SpectrogramParser.SPEC_AUGMENT: #??????????????????????????????
             feature = self.spec_augment(feature)
 
         return feature

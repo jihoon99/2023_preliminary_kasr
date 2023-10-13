@@ -42,7 +42,12 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             config,  # set of arguments
             spec_augment: bool = False,  # flag indication whether to use spec-augmentation of not
             dataset_path: str = None,  # path of dataset,
-            audio_extension: str = 'pcm'  # audio extension
+            audio_extension: str = 'wav',  # audio extension
+            remove_noise=True,
+            audio_threshold=0.0075,
+            min_silence_len=3,
+            ratio=16_000,
+            make_silence_len=1
     ) -> None:
         super(SpectrogramDataset, self).__init__(
             feature_extract_by=config.feature_extract_by, 
@@ -61,6 +66,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             dataset_path=dataset_path,  # config.dataset_path
             transform_method=config.transform_method,
             audio_extension=audio_extension
+
         )
         self.audio_paths = list(audio_paths)
         self.transcripts = list(transcripts)
@@ -70,9 +76,23 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self._augment(spec_augment) # 증강방법은 나ㅇ에.
         self.shuffle() # -> 또 섞어? DataLoader에 shuffle 파라미어 있는데,,, 
 
+        self.remove_noise = remove_noise
+        self.audio_threshold = audio_threshold
+        self.min_silence_len = min_silence_len
+        self.ratio = ratio
+        self.make_silence_len = make_silence_len
+
     def __getitem__(self, idx):
         """ get feature vector & transcript """
-        feature = self.parse_audio(os.path.join(self.dataset_path, self.audio_paths[idx]), self.augment_methods[idx]) # 해당하는 오디오를 불러옴.
+        feature = self.parse_audio(
+            os.path.join(self.dataset_path, self.audio_paths[idx]), 
+            self.augment_methods[idx],
+            remove_noise = self.remove_noise,
+            audio_threshold = self.audio_threshold,
+            min_silence_len = self.min_silence_len,
+            ratio = self.ratio,
+            make_silence_len = self.make_silence_len
+            ) # 해당하는 오디오를 불러옴.
         # 더 들어가면 modules/audio/core에서 load하는 메서드가 있는데, silence remove 하는 부분의 로직이 빈약함. -> 예선전 알고리즘으로 고도화 가능
 
         if feature is None:
@@ -198,7 +218,11 @@ def load_dataset(transcripts_path):
     return audio_paths, transcripts # 이것들 다 list 임.
 
 
-def split_dataset(config, transcripts_path: str, vocab: Vocabulary, valid_size=.2):
+def split_dataset(
+        config, 
+        transcripts_path: str,
+        vocab: Vocabulary, 
+        valid_size=.2):
     """
     split into training set and validation set.
 
@@ -223,7 +247,7 @@ def split_dataset(config, transcripts_path: str, vocab: Vocabulary, valid_size=.
     if config.version == 'PoC':
         audio_paths = audio_paths[:1000]
         transcripts = transcripts[:1000]
-        
+
     train_audio_paths, valid_audio_paths, train_transcripts, valid_transcripts = train_test_split(audio_paths,
                                                                                                   transcripts,
                                                                                                   test_size=valid_size) # sklearn train_test_split임.
@@ -305,3 +329,7 @@ def collate_fn(batch):
         return seqs, targets, seq_lengths, target_lengths
     except Exception as e:
         print(e)
+
+
+if __name__ == "__main__":
+    pass

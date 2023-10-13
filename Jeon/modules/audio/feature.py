@@ -236,3 +236,20 @@ class FilterBank(object):
             frame_length=self.frame_length,
             frame_shift=self.frame_shift,
         ).transpose(0, 1).numpy()
+    
+
+
+if __name__ == "__main__":
+
+    audio_path = '/Users/rainism/Desktop/2023_AI_hub/2023_preliminary_kasr/task3_02.pcm'
+
+    signal = np.memmap(audio_path, dtype='h', mode='r').astype('float32')
+    signal_normalized = signal/32767
+
+    n_mels = 80
+    frame_length = 20
+    frame_shift = 10
+    transforms = FilterBank(n_mels, frame_length, frame_shift)
+    aa = transforms(signal_normalized)
+
+    print(aa.shape)
