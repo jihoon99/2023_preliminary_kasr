@@ -165,6 +165,13 @@ if __name__ == '__main__':
     args.add_argument('--audio_extension', type=str, default='wav')
     args.add_argument('--transform_method', type=str, default='fbank')
     args.add_argument('--feature_extract_by', type=str, default='kaldi')
+    
+    args.add_argument("--del_silence", type=bool, default=True)
+    args.add_argument("--remove_noise", type=bool, default=True)
+    args.add_argument("--audio_threshold", type=float, default=0.0075) # 에선 대회 3에서는 0.0885
+    args.add_argument("--min_silence_len", type=float, default=3)
+    args.add_argument("--make_silence_len", type=float, default=1)
+
     args.add_argument('--sample_rate', type=int, default=16000)
     args.add_argument('--frame_length', type=int, default=20)
     args.add_argument('--frame_shift', type=int, default=10)
@@ -173,7 +180,6 @@ if __name__ == '__main__':
     args.add_argument('--time_mask_num', type=int, default=4)
     args.add_argument('--freq_mask_num', type=int, default=2)
     args.add_argument('--normalize', type=bool, default=True)
-    args.add_argument('--del_silence', type=bool, default=True)
     args.add_argument('--spec_augment', type=bool, default=True)
     args.add_argument('--input_reverse', type=bool, default=False)
 
@@ -197,7 +203,7 @@ if __name__ == '__main__':
     args.add_argument('--weight_decay', type=float, default=1e-05)
 
     # explode 예방
-    args.add_argument('--max_grad_norm', type=int, default=400)
+    args.add_argument('--max_grad_norm', type=int, default=400) ######################## 수정이 필요함.
 
     # check
     args.add_argument('--reduction', type=str, default='mean')        # check
@@ -209,16 +215,18 @@ if __name__ == '__main__':
     args.add_argument('--num_encoder_layers', type=int, default=3)
     args.add_argument('--hidden_dim', type=int, default=1024)
     args.add_argument('--rnn_type', type=str, default='gru')           # check
-    args.add_argument('--max_len', type=int, default=400)
+    args.add_argument('--max_len', type=int, default=400)              #############################이부분도 ???
     args.add_argument('--activation', type=str, default='hardtanh')
     args.add_argument('--use_bidirectional', type=bool, default=True) # maybe decoder aggregator
-
 
     args.add_argument('--teacher_forcing_ratio', type=float, default=1.0)  # check
     args.add_argument('--teacher_forcing_step', type=float, default=0.0)   # check
     args.add_argument('--min_teacher_forcing_ratio', type=float, default=1.0)  # check
     args.add_argument('--joint_ctc_attention', type=bool, default=False)   # check
     config = args.parse_args()
+
+    if config.version == 'POC':
+        config.num_epochs = 1
 
     warnings.filterwarnings('ignore')
 
@@ -279,7 +287,8 @@ if __name__ == '__main__':
             batch_size=config.batch_size,
             shuffle=True,
             collate_fn=collate_fn,            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
-            num_workers=config.num_workers
+            num_workers=config.num_workers,
+            drop_last=True
         )
 
         valid_loader = DataLoader(
@@ -287,7 +296,8 @@ if __name__ == '__main__':
             batch_size=config.batch_size,
             shuffle=True,
             collate_fn=collate_fn,
-            num_workers=config.num_workers
+            num_workers=config.num_workers,
+            drop_last=True
         )
 
         print("#"*100)
@@ -296,7 +306,7 @@ if __name__ == '__main__':
         print(f'TRAINING DATA : seqs : {_seqs.shape}')
         print(f'TRAINING DATA : targets : {_targets.shape}')
         print(f'TRAINING DATA : seq lengths : {_seq_lengths.shape}')
-        print(f'TRAINING DATA : target lengths : {_target_lengths.shape}')
+        # print(f'TRAINING DATA : target lengths : {_target_lengths.shape}')
         print("#"*100)
 
 

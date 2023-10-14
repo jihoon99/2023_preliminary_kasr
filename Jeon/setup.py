@@ -7,8 +7,10 @@ setup(
     install_requires=[
         # 'torch==1.7.0',
         # 'levenshtein',
+        'noisereduce',
         'librosa >= 0.7.0',
-        'numpy',
+        'numpy==1.21.6',
+        'scipy',
         'pandas',
         'tqdm',
         'matplotlib',
@@ -16,7 +18,7 @@ setup(
         'sentencepiece',
         'torchaudio==0.6.0',
         'pydub',
-        'glob2'
+        'glob2',
     ],
 )
 

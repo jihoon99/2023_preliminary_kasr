@@ -23,13 +23,13 @@ from numpy.lib.stride_tricks import as_strided
 from noisereduce import reduce_noise
 
 
-def remove_noise(np_wav, ratio=16_000):
+def remove_noise_data(np_wav, ratio=16_000):
     return reduce_noise(y = np_wav, sr=ratio, stationary=False)
 
 
 def detect_silence(pcm, audio_threshold = 0.0075, min_silence_len = 3, ratio=16000, make_silence_len=1):
     if len(pcm) < min_silence_len*ratio:
-        return []
+        return pcm
     
     b = np.where((abs(pcm) > audio_threshold) == True)[0] # 소리가 나는 부분
     c = np.concatenate(([0], b[:-1]), axis=0)
@@ -55,7 +55,7 @@ def detect_silence(pcm, audio_threshold = 0.0075, min_silence_len = 3, ratio=160
 
 def load_audio(audio_path: str,
                del_silence: bool = False, 
-               extension: str = 'pcm', 
+               extension: str = 'wav', 
                remove_noise=True,
                audio_threshold=0.0075,
                min_silence_len=3,
@@ -71,7 +71,7 @@ def load_audio(audio_path: str,
             signal_normalized = signal/32767
 
             if remove_noise:
-                signal_normalized = remove_noise(
+                signal_normalized = remove_noise_data(
                     signal_normalized, 
                     ratio = ratio)
                 
@@ -100,7 +100,7 @@ def load_audio(audio_path: str,
             signal_normalized = signal/32767
 
             if remove_noise:
-                signal_normalized = remove_noise(
+                signal_normalized = remove_noise_data(
                     signal_normalized, 
                     ratio = ratio)
                 

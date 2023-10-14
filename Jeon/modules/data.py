@@ -42,30 +42,23 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             config,  # set of arguments
             spec_augment: bool = False,  # flag indication whether to use spec-augmentation of not
             dataset_path: str = None,  # path of dataset,
-            audio_extension: str = 'wav',  # audio extension
-            remove_noise=True,
-            audio_threshold=0.0075,
-            min_silence_len=3,
-            ratio=16_000,
-            make_silence_len=1
     ) -> None:
         super(SpectrogramDataset, self).__init__(
-            feature_extract_by=config.feature_extract_by, 
-            sample_rate=config.sample_rate,
-            n_mels=config.n_mels, 
-            frame_length=config.frame_length, 
-            frame_shift=config.frame_shift,
-            del_silence=config.del_silence, 
-            input_reverse=config.input_reverse,
-            normalize=config.normalize, 
-            freq_mask_para=config.freq_mask_para,
-            time_mask_num=config.time_mask_num, 
-            freq_mask_num=config.freq_mask_num,
-            sos_id=sos_id, 
-            eos_id=eos_id, 
-            dataset_path=dataset_path,  # config.dataset_path
-            transform_method=config.transform_method,
-            audio_extension=audio_extension
+            feature_extract_by = config.feature_extract_by, 
+            sample_rate       = config.sample_rate,
+            n_mels            = config.n_mels, 
+            frame_length      = config.frame_length, 
+            frame_shift       = config.frame_shift,
+            input_reverse     = config.input_reverse,
+            normalize         = config.normalize, 
+            freq_mask_para    = config.freq_mask_para,
+            time_mask_num     = config.time_mask_num, 
+            freq_mask_num     = config.freq_mask_num,
+            sos_id            = sos_id, 
+            eos_id            = eos_id, 
+            dataset_path      = dataset_path,  # config.dataset_path
+            transform_method  = config.transform_method,
+            audio_extension   = config.audio_extension
 
         )
         self.audio_paths = list(audio_paths)
@@ -76,22 +69,14 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         self._augment(spec_augment) # 증강방법은 나ㅇ에.
         self.shuffle() # -> 또 섞어? DataLoader에 shuffle 파라미어 있는데,,, 
 
-        self.remove_noise = remove_noise
-        self.audio_threshold = audio_threshold
-        self.min_silence_len = min_silence_len
-        self.ratio = ratio
-        self.make_silence_len = make_silence_len
+        self.config = config
 
     def __getitem__(self, idx):
         """ get feature vector & transcript """
         feature = self.parse_audio(
-            os.path.join(self.dataset_path, self.audio_paths[idx]), 
-            self.augment_methods[idx],
-            remove_noise = self.remove_noise,
-            audio_threshold = self.audio_threshold,
-            min_silence_len = self.min_silence_len,
-            ratio = self.ratio,
-            make_silence_len = self.make_silence_len
+            audio_path       = os.path.join(self.dataset_path, self.audio_paths[idx]), 
+            augment_method   = self.augment_methods[idx],
+            config           = self.config
             ) # 해당하는 오디오를 불러옴.
         # 더 들어가면 modules/audio/core에서 load하는 메서드가 있는데, silence remove 하는 부분의 로직이 빈약함. -> 예선전 알고리즘으로 고도화 가능
 
@@ -268,7 +253,6 @@ def split_dataset(
         config=config,
         spec_augment=config.spec_augment,
         dataset_path=config.dataset_path,
-        audio_extension=config.audio_extension,
     )
 
     valid_dataset = SpectrogramDataset(
@@ -278,7 +262,6 @@ def split_dataset(
         config=config,
         spec_augment=config.spec_augment,
         dataset_path=config.dataset_path,
-        audio_extension=config.audio_extension,
     )
 
     return train_dataset, valid_dataset
@@ -316,7 +299,7 @@ def collate_fn(batch):
         targets = torch.zeros(batch_size, max_target_size).to(torch.long)
         targets.fill_(pad_id)
 
-        for x in range(batch_size):
+        for x in range(batch_size): 
             sample = batch[x]
             tensor = sample[0]
             target = sample[1]

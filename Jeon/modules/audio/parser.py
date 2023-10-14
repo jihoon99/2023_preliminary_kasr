@@ -78,7 +78,6 @@ class SpectrogramParser(AudioParser):
             n_mels: int = 80,                         # Number of mfc coefficients to retain.
             frame_length: int = 20,                   # frame length for spectrogram
             frame_shift: int = 10,                    # Length of hop between STFT windows.
-            del_silence: bool = True,                # flag indication whether to delete silence or not
             input_reverse: bool = True,               # flag indication whether to reverse input or not
             normalize: bool = False,                  # flag indication whether to normalize spectrum or not
             transform_method: str = 'mel',            # which feature to use [mel, fbank, spect, mfcc]
@@ -88,10 +87,9 @@ class SpectrogramParser(AudioParser):
             sos_id: int = 1,                          # start of sentence token`s identification
             eos_id: int = 2,                          # end of sentence token`s identification
             dataset_path: str = None,                 # noise dataset path
-            audio_extension: str = 'pcm',             # audio extension
+            audio_extension: str = 'wav',             # audio extension
     ) -> None:
         super(SpectrogramParser, self).__init__(dataset_path)
-        self.del_silence = del_silence
         self.input_reverse = input_reverse
         self.normalize = normalize
         self.sos_id = sos_id
@@ -113,11 +111,7 @@ class SpectrogramParser(AudioParser):
     def parse_audio(self, 
                     audio_path: str, 
                     augment_method: int, 
-                    remove_noise=True,
-                    audio_threshold=0.0075,
-                    min_silence_len=3,
-                    ratio=16_000,
-                    make_silence_len=1) -> Tensor:
+                    config) -> Tensor:
         """
         Parses audio.
 
@@ -130,13 +124,13 @@ class SpectrogramParser(AudioParser):
         """
         signal = load_audio(
             audio_path, 
-            self.del_silence, 
-            extension=self.audio_extension,
-            remove_noise=remove_noise,
-            audio_threshold=audio_threshold,
-            min_silence_len=min_silence_len,
-            ratio=ratio,
-            make_silence_len=make_silence_len)
+            del_silence      = config.del_silence,
+            extension        = self.audio_extension,
+            remove_noise     = config.remove_noise,
+            audio_threshold  = config.audio_threshold,
+            min_silence_len  = config.min_silence_len,
+            ratio            = config.sample_rate,
+            make_silence_len = config.make_silence_len)
 
         if signal is None:
             # print("Audio is None : {0}".format(audio_path))
