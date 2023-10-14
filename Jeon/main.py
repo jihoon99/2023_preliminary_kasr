@@ -200,7 +200,8 @@ if __name__ == '__main__':
     args.add_argument('--init_lr_scale', type=float, default=1e-02)
     args.add_argument('--final_lr_scale', type=float, default=5e-02)
     args.add_argument('--warmup_steps', type=int, default=1000)
-    args.add_argument('--weight_decay', type=float, default=1e-05)
+    # args.add_argument('--weight_decay', default=1e-05)
+    args.add_argument('--weight_decay', default=False)
 
     # explode 예방
     args.add_argument('--max_grad_norm', type=int, default=400) ######################## 수정이 필요함.

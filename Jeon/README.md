@@ -10,6 +10,8 @@
    > inf, 0, nan으로 변환되는 문제 해결
    > dataloader maxlen padding broadcasting으로 진행
    > 모델 아키텍쳐 고도화
+   > 데이터 중에서 캐릭터의 갯수가 4개 이하 제거
+   > LM Decoder 만들기
 
 2. zip하여 서버에 옮기기
 

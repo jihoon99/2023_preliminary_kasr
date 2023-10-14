@@ -518,7 +518,7 @@ def build_deepspeech2(
         bidirectional: bool,
         activation: str,
         device: torch.device,
-) -> nn.DataParallel:
+):
     if dropout_p < 0.0:
         raise ParameterError("dropout probability should be positive")
     if input_size < 0:
@@ -528,18 +528,31 @@ def build_deepspeech2(
     if num_rnn_layers < 0:
         raise ParameterError("num_layers should be greater than 0")
 
-    return nn.DataParallel(DeepSpeech2(
-        input_dim=input_size,
-        num_classes=num_classes,
-        rnn_type=rnn_type,
-        num_rnn_layers=num_rnn_layers,
-        rnn_hidden_dim=rnn_hidden_dim,
-        dropout_p=dropout_p,
-        bidirectional=bidirectional,
-        activation=activation,
-        device=device,
-    )).to(device) # multi gpu 사용함.
 
+    if torch.cuda.device_count() > 1:
+        return nn.DataParallel(DeepSpeech2(
+            input_dim=input_size,
+            num_classes=num_classes,
+            rnn_type=rnn_type,
+            num_rnn_layers=num_rnn_layers,
+            rnn_hidden_dim=rnn_hidden_dim,
+            dropout_p=dropout_p,
+            bidirectional=bidirectional,
+            activation=activation,
+            device=device,
+        )).to(device) # multi gpu 사용함.
+    else:
+        return DeepSpeech2(
+            input_dim=input_size,
+            num_classes=num_classes,
+            rnn_type=rnn_type,
+            num_rnn_layers=num_rnn_layers,
+            rnn_hidden_dim=rnn_hidden_dim,
+            dropout_p=dropout_p,
+            bidirectional=bidirectional,
+            activation=activation,
+            device=device,
+        ).to(device)
 
 # def build_model(
 #         config,

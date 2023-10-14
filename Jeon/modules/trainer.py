@@ -10,8 +10,8 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
 
     model.train()
 
-    log_format = "[INFO] step: {:4d}/{:4d}, loss: {:.6f}, " \
-                              "cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h, lr: {:.6f}"
+    # log_format = "[INFO] step: {:4d}/{:4d}, loss: {:.6f}, " \
+    #                           "cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h, lr: {:.6f}"
     total_num = 0
     epoch_loss_total = 0.
     print(f'[INFO] TRAINING Start')
@@ -41,7 +41,7 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
         # batch 128 크다 그러니까 : cumulate backward step 방법론 생각해봄직함. 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step(model)
+        optimizer.step()
 
         total_num += int(input_lengths.sum())
         epoch_loss_total += loss.item()
@@ -55,11 +55,15 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
             epoch_elapsed = (current_time - epoch_begin_time) / 60.0    # 아 초, 단위로 한거구나.
             train_elapsed = (current_time - train_begin_time) / 3600.0  # 시간 단위로 변환한거구나.
             cer = metric(targets[:, 1:], y_hats)
-            print(log_format.format(
-                cnt, len(dataloader), loss,
-                cer, elapsed, epoch_elapsed, train_elapsed,
-                optimizer.get_lr(),
-            ))
+
+
+            print(f'[INFO] TRAINING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
+                
+            # print(log_format.format(
+            #     cnt, len(dataloader), loss,
+            #     cer, elapsed, epoch_elapsed, train_elapsed,
+            #     # optimizer.get_lr(),
+            # ))
         cnt += 1
     return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
 
@@ -69,8 +73,8 @@ def validating(mode, config, dataloader, optimizer, model, criterion, metric, tr
     model.eval()
 
 
-    log_format = "[INFO] step: {:4d}/{:4d}, loss: {:.6f}, " \
-                              "cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h, lr: {:.6f}"
+    # log_format = "[INFO] step: {:4d}/{:4d}, loss: {:.6f}, " \
+    #                           "cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h, lr: {:.6f}"
     total_num = 0
     epoch_loss_total = 0.
     print(f'[INFO] VALIDATING Start')
@@ -102,7 +106,7 @@ def validating(mode, config, dataloader, optimizer, model, criterion, metric, tr
             if mode == 'train':
                 optimizer.zero_grad()
                 loss.backward()
-                optimizer.step(model)
+                optimizer.step()
 
             total_num += int(input_lengths.sum())
             epoch_loss_total += loss.item()
@@ -116,11 +120,14 @@ def validating(mode, config, dataloader, optimizer, model, criterion, metric, tr
                 epoch_elapsed = (current_time - epoch_begin_time) / 60.0
                 train_elapsed = (current_time - train_begin_time) / 3600.0
                 cer = metric(targets[:, 1:], y_hats)
-                print(log_format.format(
-                    cnt, len(dataloader), loss,
-                    cer, elapsed, epoch_elapsed, train_elapsed,
-                    optimizer.get_lr(),
-                ))
+                
+                print(f'[INFO] VALIDATING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
+
+                # print(log_format.format(
+                #     cnt, len(dataloader), loss,
+                #     cer, elapsed, epoch_elapsed, train_elapsed,
+                #     # optimizer.get_lr(),
+                # ))
             cnt += 1
         return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
     
