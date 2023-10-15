@@ -117,5 +117,7 @@ print('groupby text_len count')
 print(read_label_csv.groupby("text_len")[['text']].count())
 
 
+
+
 end = datetime.datetime.now()
 print('duration time :', end-start)

@@ -21,6 +21,31 @@ from modules.audio.parser import SpectrogramParser
 import librosa
 import sklearn
 
+from noisereduce import reduce_noise
+
+def remove_noise_data(np_wav, ratio=16_000):
+    return reduce_noise(y = np_wav, sr=ratio, stationary=False)
+
+def detect_silence(pcm, audio_threshold = 0.0075, min_silence_len = 3, ratio=16000, make_silence_len=1):
+    if len(pcm) < min_silence_len*ratio:
+        return pcm
+    
+    b = np.where((abs(pcm) > audio_threshold) == True)[0] # 소리가 나는 부분
+    c = np.concatenate(([0], b[:-1]), axis=0)
+
+    starts = c[(b-c)>min_silence_len*ratio]               # 소리가 안나는 부분 시작
+    ends = b[(b-c)>min_silence_len*ratio]
+
+    if len(ends) == 0:
+        return pcm
+    else:
+        non_masking = np.array([True]*len(pcm))
+        for (s,e) in zip(starts, ends):
+            non_masking[s:e+1] = False
+            non_masking[e-make_silence_len*ratio:e+1] = True
+        
+        return pcm[non_masking]
+
 
 class CustomPadFill():
     def __init__(self, padding_token, config):
@@ -36,6 +61,7 @@ class CustomPadFill():
         return template(feature)
     
     def custom_target_padding1(self, targets, max_len):
+        
         zero_targets = torch.zeros(self.config.batch_size, max_len).to(torch.long)
         zero_targets.fill_(self.padding_token)
 
@@ -51,18 +77,17 @@ class CustomPadFill():
         feature_len = []
 
         for feature, target in bs:
+            # feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             feature_len += [feature.shape[-1]]
             target_len += [target.shape[-1]] # baseline에서는 -1을 햇음 왜그랬을까?
+            targets += [target]
 
-
-        max_feature_len = max(feature_len)
+        max_feature_len = min(max(feature_len), self.config.mfcc_max_len)
         max_target_len = max(target_len)
-
 
         for (feature, target), current_feature_len, current_target_len in zip(bs, feature_len, target_len):
             #targets += [self.custom_target_padding1(target, max_target_len, current_target_len)]
             features += [self.custom_feature_padding(feature, max_feature_len, current_feature_len).unsqueeze(0)]
-            
 
 
         targets = self.custom_target_padding1(targets, max_target_len)
@@ -241,6 +266,18 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         audio, sr = librosa.load(path, sr=self.config.sample_rate)
         audio, _ = librosa.effects.trim(audio)
 
+        if self.config.remove_noise:
+            audio = remove_noise_data(audio)
+
+        if self.config.del_silence:
+            audio = detect_silence(
+                audio,
+                audio_threshold=self.config.audio_threshold,
+                min_silence_len=self.config.min_silence_len,
+                ratio = self.config.sample_rate,
+                make_silence_len=self.config.make_silence_len
+                )
+
         ######### 하드 코딩 된 부분들
         mfcc = librosa.feature.mfcc(
             y = audio, 
@@ -249,6 +286,7 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
             n_fft=400, 
             hop_length=160
         )
+
 
 
         ########################3 하드 코딩 부분 변경 ##################

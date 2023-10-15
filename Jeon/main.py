@@ -144,7 +144,9 @@ def build_model(
                     num_classes=len(vocab), 
                     input_dim=config.n_mels, 
                     # encoder_dim=512, 
-                    # num_encoder_layers=3
+                    num_encoder_layers=6,
+                    feed_forward_expansion_factor = 2,
+
             ).to(device)
 
     return model
@@ -160,7 +162,7 @@ if __name__ == '__main__':
     args.add_argument('--iteration', type=str, default='0')
     args.add_argument('--pause', type=int, default=0)
     # Parameters 
-    args.add_argument('--version', type=str, default='POC')
+    args.add_argument('--version', type=str, default='train')
     args.add_argument('--make_bow', type=bool, default=True)
 
     args.add_argument('--use_cuda', type=bool, default=True)
@@ -185,6 +187,8 @@ if __name__ == '__main__':
     args.add_argument("--audio_threshold", type=float, default=0.0075) # 에선 대회 3에서는 0.0885
     args.add_argument("--min_silence_len", type=float, default=3)
     args.add_argument("--make_silence_len", type=float, default=1)
+    #MFCC hardCoded
+    args.add_argument("--mfcc_max_len", default=1600)
 
     args.add_argument('--sample_rate', type=int, default=16000)
     args.add_argument('--frame_length', type=int, default=20)

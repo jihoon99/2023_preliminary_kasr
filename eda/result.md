@@ -173,3 +173,18 @@ text_len
 294          2
 297          1
 ```
+
+
+# 5. MFCC max len eda
+```
+90%
+torch.Size([80, 1301])
+
+95%
+torch.Size([80, 1635])
+
+99%
+torch.Size([80, 1743])
+
+
+```
