@@ -13,6 +13,7 @@
    > 데이터 중에서 캐릭터의 갯수가 4개 이하 제거
    > LM Decoder 만들기
    > grad clipping 수정 필요
+   > accumulate loss step 작성 필요
 
 2. zip하여 서버에 옮기기
 
