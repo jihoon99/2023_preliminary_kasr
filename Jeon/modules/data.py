@@ -18,6 +18,172 @@ from modules.vocab import Vocabulary
 from modules.audio.core import load_audio
 from modules.audio.parser import SpectrogramParser
 
+import librosa
+import sklearn
+
+
+class CustomPadFill():
+    def __init__(self, padding_token, config):
+        self.config = config
+        self.padding_token = padding_token
+
+    #def custom_target_padding(self, target, max_len, current_len):
+    #    template = nn.ZeroPad1d((0,max_len-current_len,0,0))
+    #    return template(target)
+
+    def custom_feature_padding(self, feature, max_len, current_len):
+        template = nn.ZeroPad2d((0,max_len-current_len,0,0))
+        return template(feature)
+    
+    def custom_target_padding1(self, targets, max_len):
+        zero_targets = torch.zeros(self.config.batch_size, max_len).to(torch.long)
+        zero_targets.fill_(self.padding_token)
+
+        for idx, target in enumerate(targets):
+            zero_targets[idx].narrow(0,0,len(target)).copy_(torch.LongTensor(target))
+        return zero_targets
+
+    def __call__(self, bs):
+        
+        targets = []
+        features = []
+        target_len = []
+        feature_len = []
+
+        for feature, target in bs:
+            feature_len += [feature.shape[-1]]
+            target_len += [target.shape[-1]] # baseline에서는 -1을 햇음 왜그랬을까?
+
+
+        max_feature_len = max(feature_len)
+        max_target_len = max(target_len)
+
+
+        for (feature, target), current_feature_len, current_target_len in zip(bs, feature_len, target_len):
+            #targets += [self.custom_target_padding1(target, max_target_len, current_target_len)]
+            features += [self.custom_feature_padding(feature, max_feature_len, current_feature_len).unsqueeze(0)]
+            
+
+
+        targets = self.custom_target_padding1(targets, max_target_len)
+        #targets = torch.cat(targets, dim=0)
+        features = torch.cat(features, dim=0).transpose(-1,-2)
+
+        feature_len = torch.IntTensor(feature_len)
+        target_len = torch.IntTensor(target_len)
+
+        return features, targets, feature_len, target_len
+
+
+class PadFill():
+
+    def __init__(self, padding_token, config):
+        '''
+            tokenizer : hugging face tokeninzer
+            max_length : limit sequence length of texts
+            with_text : return with original text which means not passing through tokenizer
+
+        '''
+        # self.max_frame_length = config.max_frame_length
+        # self.max_target_length = config.max_target_length
+        self.config = config
+        self.padding_token = padding_token
+        # self.char_to_num = char_to_num
+        # self.adj_matrix = adj_matrix
+
+    # def padding_hands(self, frames):
+    #     (_, node_len, feature_len) = frames[0].shape
+
+    #     # max_frame = min(self.config.max_frame_length, max([i.shape[0] for i in frames]))
+    #     max_frame = max([i.shape[0] for i in frames])
+    #     if self.config.padding_max:
+    #         max_frame = self.max_frame_length
+
+
+    #     frames = torch.nested.nested_tensor(frames)
+    #     frames = torch.nested.to_padded_tensor(frames, 0, (self.config.batch_size,
+    #                                                        max_frame, 
+    #                                                         node_len,
+    #                                                         feature_len))
+    #     return frames, max_frame
+
+
+    def padding_speech(self, features):
+
+        max_seq = features.max(axis=-2)
+        # max_seq = max(i.shape[-2] for i in features)
+
+        if len(features[0].shape) == 2:
+            (_, feature_len) = features[0].shape
+            re_shape = (self.config.batch_size, max_seq, feature_len)
+        elif len(features[0].shape) == 3:
+            (channel, _, feature_len) = features[0].shape
+            re_shape = (self.config.batch_size, channel, max_seq, feature_len)
+
+        features = torch.nested.nested_tensor(features)
+        features = torch.nested.to_padded_tensor(features, 0, re_shape)
+
+        return features, max_seq
+
+
+    def padding_target(self, targets):
+        
+        max_char = targets.max(axis=1)
+
+        # if self.config.padding_max:
+        #     max_char = self.max_target_length
+
+        targets = torch.nested.nested_tensor(targets)
+        targets = torch.nested.to_padded_tensor(targets, 
+                                                self.padding_token,
+                                                (self.config.batch_size,
+                                                max_char))
+
+        return targets, max_char
+    
+
+    def __call__(self, bs):
+        # y, ytoken, hand_df
+
+
+        pad_id = 0
+        """ functions that pad to the maximum sequence length """
+
+        def seq_length_(p):
+            return len(p[0])
+
+        def target_length_(p):
+            return len(p[1])
+
+        # sort by sequence length for rnn.pack_padded_sequence()
+        # batch = [i for i in batch if i != None]
+        # batch = sorted(batch, key=lambda sample: sample[0].size(0), reverse=True)
+
+        features = [s[0] for s in bs]
+        targets = [s[1] for s in bs]
+
+        seq_lengths = [len(s[0]) for s in bs]
+        target_lengths = [len(s[1]) - 1 for s in bs]
+
+        # max_seq_sample = max(bs, key=seq_length_)[0]
+        # max_target_sample = max(bs, key=target_length_)[1]
+
+        # max_seq_size = max_seq_sample.size(0)
+        # max_target_size = len(max_target_sample)
+
+        # feat_size = max_seq_sample.size(1)
+        batch_size = len(bs)
+
+        # seqs = torch.zeros(batch_size, max_seq_size, feat_size)
+        # targets = torch.zeros(batch_size, max_target_size).to(torch.long)
+        # targets.fill_(pad_id)
+
+        pad_targets, max_y = self.padding_target(targets)
+        pad_features, max_seq = self.padding_speech(features)
+
+        return pad_features, pad_targets, seq_lengths, target_lengths
+
+
 
 class SpectrogramDataset(Dataset, SpectrogramParser):
     """
@@ -71,17 +237,50 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
 
         self.config = config
 
+    def wav2image_tensor(self, path):
+        audio, sr = librosa.load(path, sr=self.config.sample_rate)
+        audio, _ = librosa.effects.trim(audio)
+
+        ######### 하드 코딩 된 부분들
+        mfcc = librosa.feature.mfcc(
+            y = audio, 
+            sr=self.config.sample_rate, 
+            n_mfcc=self.config.n_mels, 
+            n_fft=400, 
+            hop_length=160
+        )
+
+
+        ########################3 하드 코딩 부분 변경 ##################
+        # max_len = 1000
+        mfcc = sklearn.preprocessing.scale(mfcc, axis=1)
+        # def pad2d(a, i): return a[:, 0:i] if a.shape[1] > i else np.hstack(
+        #     (a, np.zeros((a.shape[0], i-a.shape[1]))))
+        # padded_mfcc = pad2d(mfcc, max_len).reshape( 
+        #     1, self.config.n_mels, max_len)  # 채널 추가
+        mfcc = torch.tensor(mfcc, dtype=torch.float)
+
+        #######################################################   reshape을 해줘야 할 수 도있음.  deepspeech2인가 하는놈은 bs, feat, leng로 들어가는 것 같은데..
+
+        return mfcc
+    
     def __getitem__(self, idx):
         """ get feature vector & transcript """
-        feature = self.parse_audio(
-            audio_path       = os.path.join(self.dataset_path, self.audio_paths[idx]), 
-            augment_method   = self.augment_methods[idx],
-            config           = self.config
-            ) # 해당하는 오디오를 불러옴.
-        # 더 들어가면 modules/audio/core에서 load하는 메서드가 있는데, silence remove 하는 부분의 로직이 빈약함. -> 예선전 알고리즘으로 고도화 가능
+        # feature = self.parse_audio(
+        #     audio_path       = os.path.join(self.dataset_path, self.audio_paths[idx]), 
+        #     augment_method   = self.augment_methods[idx],
+        #     config           = self.config
+        #     ) # 해당하는 오디오를 불러옴.
+        # # 더 들어가면 modules/audio/core에서 load하는 메서드가 있는데, silence remove 하는 부분의 로직이 빈약함. -> 예선전 알고리즘으로 고도화 가능
 
-        if feature is None:
-            return None
+
+        feature = self.wav2image_tensor(
+            os.path.join(self.dataset_path, self.audio_paths[idx])
+            )
+
+
+        # if feature is None:
+        #     return None
 
         transcript, status = self.parse_transcript(self.transcripts[idx])
         # self.transcripts[idx] : 2345 1353 1 3817 2038  이렇게 생겼음. 토큰 단위로 잘라줘야함.
@@ -90,6 +289,8 @@ class SpectrogramDataset(Dataset, SpectrogramParser):
         if status == 'err':
             print(self.transcripts[idx])
             print(idx)
+
+        transcript = torch.tensor(transcript).long()
         return feature, transcript # feature : spectogram audio, trasncript : list contain tokens
         # feature  부분 shape 더 살펴봐야함
         # wave2vec2.0 pretrained version 사용해서 고도화 가능
@@ -229,7 +430,7 @@ def split_dataset(
     audio_paths, transcripts = load_dataset(transcripts_path) # 리스트를 아웃풋으로 내뱉음.
     # 오디오 위치, 인코딩된 문장
 
-    if config.version == 'PoC':
+    if config.version == 'POC':
         audio_paths = audio_paths[:1000]
         transcripts = transcripts[:1000]
 

@@ -78,8 +78,8 @@ class SpectrogramParser(AudioParser):
             n_mels: int = 80,                         # Number of mfc coefficients to retain.
             frame_length: int = 20,                   # frame length for spectrogram
             frame_shift: int = 10,                    # Length of hop between STFT windows.
-            input_reverse: bool = True,               # flag indication whether to reverse input or not
-            normalize: bool = False,                  # flag indication whether to normalize spectrum or not
+            input_reverse: bool = False,               # flag indication whether to reverse input or not
+            normalize: bool = True,                  # flag indication whether to normalize spectrum or not
             transform_method: str = 'mel',            # which feature to use [mel, fbank, spect, mfcc]
             freq_mask_para: int = 12,                 # hyper Parameter for Freq Masking to limit freq masking length
             time_mask_num: int = 2,                   # how many time-masked area to make
@@ -156,3 +156,28 @@ class SpectrogramParser(AudioParser):
 
     def parse_transcript(self, *args, **kwargs):
         raise NotImplementedError
+    
+
+
+if __name__ == "__main__":
+        aud = '/Users/rainism/Desktop/2023_AI_hub/2023_preliminary_kasr/task2_03.wav'
+        # aud = aud.set_frame_rate(16000)
+        # print(aud)
+        # signal = np.array(aud.get_array_of_samples()).astype('float32')
+        # print(signal.shape)
+        # print(signal)
+        
+        signal = load_audio(
+            aud,
+            del_silence=True,
+            extension='wav',
+            remove_noise=True,
+        )
+
+        transform = FilterBank(
+            16_000, 
+            n_mels = 80, 
+            frame_length = 20, 
+            frame_shift = 10)
+        
+        print(transform(signal))

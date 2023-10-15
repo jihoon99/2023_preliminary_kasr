@@ -26,8 +26,15 @@ from modules.utils import (
 # )
 # from modules.model import build_model
 from modules.model.deepspeech2 import build_deepspeech2
+from modules.model.conformer.model import Conformer
+
 from modules.vocab import KoreanSpeechVocabulary
-from modules.data import split_dataset, collate_fn
+from modules.data import (
+    split_dataset, 
+    collate_fn,
+    PadFill,
+    CustomPadFill
+)
 from modules.utils import Optimizer
 from modules.metrics import get_metric
 from modules.inference import single_infer
@@ -132,6 +139,13 @@ def build_model(
             device        = device,
         )
 
+    if config.architecture == 'conformer':
+            model = Conformer(
+                    num_classes=len(vocab), 
+                    input_dim=config.n_mels, 
+                    # encoder_dim=512, 
+                    # num_encoder_layers=3
+            ).to(device)
 
     return model
 
@@ -152,7 +166,7 @@ if __name__ == '__main__':
     args.add_argument('--use_cuda', type=bool, default=True)
     args.add_argument('--seed', type=int, default=777)
     args.add_argument('--num_epochs', type=int, default=5)
-    args.add_argument('--batch_size', type=int, default=64)
+    args.add_argument('--batch_size', type=int, default=16)
 
     args.add_argument('--save_result_every', type=int, default=2) # 2 
     args.add_argument('--checkpoint_every', type=int, default=1)  # save model every 
@@ -211,7 +225,7 @@ if __name__ == '__main__':
     args.add_argument('--total_steps', type=int, default=200000)
 
 
-    args.add_argument('--architecture', type=str, default='deepspeech2') # check
+    args.add_argument('--architecture', type=str, default='conformer') # check
     args.add_argument('--dropout', type=float, default=3e-01)
     args.add_argument('--num_encoder_layers', type=int, default=3)
     args.add_argument('--hidden_dim', type=int, default=1024)
@@ -280,14 +294,14 @@ if __name__ == '__main__':
         label_path = os.path.join(DATASET_PATH, 'train', 'train_label')         # 정답지 위치 : train_label이 csv인가 봅니다. -> columns : audio_path, transcript(sentence)
         preprocessing(label_path, os.getcwd()) # current_path/label.csv 가 존재합니다. (git에도 제가 일부를 올렸음.) # transcript
 
-        # config.version == 'PoC' 일 경우, 일부 데이터만 갖고 train_dataset, valid_datset 구성됨.
+        # config.version == 'POC' 일 경우, 일부 데이터만 갖고 train_dataset, valid_datset 구성됨.
         train_dataset, valid_dataset = split_dataset(config, os.path.join(os.getcwd(), 'transcripts.txt'), vocab) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
         
         train_loader = DataLoader(
             train_dataset,
             batch_size=config.batch_size,
             shuffle=True,
-            collate_fn=collate_fn,            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
+            collate_fn=CustomPadFill(0,config),            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
             num_workers=config.num_workers,
             drop_last=True
         )
@@ -296,7 +310,7 @@ if __name__ == '__main__':
             valid_dataset,
             batch_size=config.batch_size,
             shuffle=True,
-            collate_fn=collate_fn,
+            collate_fn=CustomPadFill(0, config),
             num_workers=config.num_workers,
             drop_last=True
         )
@@ -306,9 +320,15 @@ if __name__ == '__main__':
         print(f"TRAINING data shape")
         print(f'TRAINING DATA : seqs : {_seqs.shape}')
         print(f'TRAINING DATA : targets : {_targets.shape}')
-        print(f'TRAINING DATA : seq lengths : {_seq_lengths.shape}')
+        print(f'TRAINING DATA : seq lengths : {_seq_lengths}')
+
         # print(f'TRAINING DATA : target lengths : {_target_lengths.shape}')
         print("#"*100)
+        print(f"number of dataset : {len(train_loader)}")
+        print(_seqs)
+        print(_targets)
+        print(_seq_lengths)
+        print(_target_lengths)
 
 
         # lr 스케쥴 적용한 것과 아닌것.
@@ -340,8 +360,10 @@ if __name__ == '__main__':
 
             print('[INFO] Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
 
+            valid_begin_time = time.time()
+
             # valid
-            model, valid_loss, valid_cer = validating(
+            _, valid_loss, valid_cer = validating(
                 config,
                 valid_loader,
                 optimizer,

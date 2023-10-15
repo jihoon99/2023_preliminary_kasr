@@ -6,9 +6,9 @@
 1. 2.고도화 예정
 
    > pretrained 사용
-   > spectogram -> 다른것
-   > inf, 0, nan으로 변환되는 문제 해결
-   > dataloader maxlen padding broadcasting으로 진행
+   > ~~spectogram -> 다른것~~ : mfcc 사용 : sepctrogram의 na, -inf값 해결 못함.
+   > ~~inf, 0, nan으로 변환되는 문제 해결~~ : mfcc 사용
+   > ~~dataloader maxlen padding broadcasting으로 진행~~ : torch version 2.0 이상에서만 nested padding지원. server에서는 1.17까지 지원하여, custom padding 부분 작성
    > 모델 아키텍쳐 고도화
    > 데이터 중에서 캐릭터의 갯수가 4개 이하 제거
    > LM Decoder 만들기

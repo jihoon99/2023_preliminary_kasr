@@ -370,13 +370,23 @@ def split(y, top_db=60, ref=np.max, frame_length=2048, hop_length=512):
 
 
 if __name__ == '__main__':
-        aud = pydub.AudioSegment.from_wav('/Users/rainism/Desktop/2023_AI_hub/2023_preliminary_kasr/task2_03.wav')
-        aud = aud.set_frame_rate(16000)
-        print(aud)
-        signal = np.array(aud.get_array_of_samples()).astype('float32')
-        print(signal.shape)
-        print(signal)
+        aud = '/Users/rainism/Desktop/2023_AI_hub/2023_preliminary_kasr/task2_03.wav'
+        # aud = aud.set_frame_rate(16000)
+        # print(aud)
+        # signal = np.array(aud.get_array_of_samples()).astype('float32')
+        # print(signal.shape)
+        # print(signal)
         
+        aa = load_audio(
+            aud,
+            del_silence=True,
+            extension='wav',
+            remove_noise=True,
+        )
+
+        print(aa)
+        print(aa.shape)
+        print(type(aa))
         # if del_silence:
         #     non_silence_indices = split(signal, top_db=30)
         #     signal = np.concatenate([signal[start:end] for start, end in non_silence_indices])

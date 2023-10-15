@@ -29,11 +29,12 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
 
         outputs, output_lengths = model(inputs, input_lengths)
 
+
         loss = criterion(
             outputs.transpose(0, 1),
             targets[:, 1:],
             tuple(output_lengths),
-            tuple(target_lengths)
+            tuple(target_lengths-1)
         )
 
         y_hats = outputs.max(-1)[1]
@@ -68,7 +69,7 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
     return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
 
 
-def validating(mode, config, dataloader, optimizer, model, criterion, metric, train_begin_time, device):
+def validating(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device):
 
     model.eval()
 
@@ -85,7 +86,7 @@ def validating(mode, config, dataloader, optimizer, model, criterion, metric, tr
         for inputs, targets, input_lengths, target_lengths in dataloader: # input_lengths : audio seq length, target_length : token length
             begin_time = time.time()
 
-            optimizer.zero_grad()
+            # optimizer.zero_grad()
             inputs = inputs.to(device)
             targets = targets.to(device)
             input_lengths = input_lengths.to(device)
@@ -98,15 +99,15 @@ def validating(mode, config, dataloader, optimizer, model, criterion, metric, tr
                 outputs.transpose(0, 1),
                 targets[:, 1:],
                 tuple(output_lengths),
-                tuple(target_lengths)
+                tuple(target_lengths-1)
             )
 
             y_hats = outputs.max(-1)[1]
 
-            if mode == 'train':
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+            # if mode == 'train':
+            #     optimizer.zero_grad()
+            #     loss.backward()
+            #     optimizer.step()
 
             total_num += int(input_lengths.sum())
             epoch_loss_total += loss.item()
