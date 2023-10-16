@@ -16,7 +16,8 @@ def training(
         cer_metric,
         wer_metric,
         train_begin_time, 
-        device):
+        device,
+        vocab):
 
     model.train()
 
@@ -36,9 +37,11 @@ def training(
         input_lengths = input_lengths.to(device)
         target_lengths = torch.as_tensor(target_lengths).to(device)
         # model = model.to(device) # 모델을 불러 올 때 이미 gpu에 올림.
+        # print(f'input_lengths : {input_lengths.tolist()}')
+
 
         outputs, output_lengths = model(inputs, input_lengths)
-
+        # print(f'output_lengths : {output_lengths.tolist()}')
 
         loss = criterion(
             outputs.transpose(0, 1),
@@ -58,6 +61,13 @@ def training(
         epoch_loss_total += loss.item()
 
         torch.cuda.empty_cache()
+
+        if cnt % config.print_every == 0:
+            y_hat_decoded, targets_decoded = decoder_withoud_LM(y_hats, targets, vocab)
+            for i in range(3):
+                print(f'y_hat : {y_hats}')
+                print(f'targets : {targets}')
+
 
         if cnt % config.print_every == 0:
 
@@ -134,11 +144,13 @@ def validating(
 
             torch.cuda.empty_cache()
 
-            if cnt % int(config.print_every//2) == 0:
+            if cnt % int(config.print_every) == 0:
                 y_hat_decoded, targets_decoded = decoder_withoud_LM(y_hats, targets, vocab)
-                for i in range(5):
-                    print(f'y_hat_decoded : {y_hat_decoded[i]}')
-                    print(f'targets_decoded : {targets_decoded[i]}')
+                for i in range(3):
+                    print(f'y_hat : {y_hats}')
+                    print(f'targets : {targets}')
+                    # print(f'y_hat_decoded : {y_hat_decoded[i]}')
+                    # print(f'targets_decoded : {targets_decoded[i]}')
 
 
             if cnt % config.print_every == 0:

@@ -61,92 +61,93 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 def save_checkpoint(checkpoint, dir):
     torch.save(checkpoint, os.path.join(dir))
 
-def bind_model(model, parser):
+# def bind_model(model, parser):
 
-    def save(dir_name, *parser):
-        '''
-            save trained model to nsml system
-        '''
-        os.makedirs(dir_name, exist_ok=True)
-        save_dir = os.path.join(dir_name, 'model_checkpoint')
-        save_checkpoint(dict_for_infer['model'], save_dir)
+#     def save(dir_name, *parser):
+#         '''
+#             save trained model to nsml system
+#         '''
 
-        with open(os.path.join(dir_name, "dict_for_infer.pkl"), "wb") as f:
-            pickle.dump(dict_for_infer, f)
+#         os.makedirs(dir_name, exist_ok=True)
+#         save_dir = os.path.join(dir_name, 'model_checkpoint')
+#         save_checkpoint(model_states, save_dir)
 
-        print(f"학습 모델 저장 완료!")
+#         with open(os.path.join(dir_name, "dict_for_infer.pkl"), "wb") as f:
+#             pickle.dump(dict_for_infer, f)
 
-
-    def load(dir_name, *parser):
-        '''
-            load saved model from nsml system
-        '''
-        save_dir = os.path.join(dir_name, 'model_checkpoint')
-        global checkpoint
-        checkpoint = torch.load(save_dir)
-        model.load_state_dict(checkpoint)
-        global dict_for_infer
-        with open(os.path.join(dir_name, "dict_for_infer.pkl"), 'rb') as f:
-            dict_for_infer = pickle.load(f)
-        print("    ***학습 모델 로딩 완료!")
+#         print(f"학습 모델 저장 완료!")
 
 
-    def infer(test_path, *parser):
-        config = dict_for_infer['config']
-        vocab = dict_for_infer['vocab']
-        model.to('cuda')
-        model.eval()
-
-        results = []
-        for i in glob(os.path.join(test_path, '*')): # glob이 도커에 안깔림...
-            results.append(
-                {
-                    'filename': i.split('/')[-1],
-                    'text': custom_oneToken_infer_for_testing(model, i, vocab, config)[0]
-                }
-            )
-        return sorted(results, key=lambda x: x['filename'])
+#     def load(dir_name, *parser):
+#         '''
+#             load saved model from nsml system
+#         '''
+#         save_dir = os.path.join(dir_name, 'model_checkpoint')
+#         global checkpoint
+#         checkpoint = torch.load(save_dir)
+#         model.load_state_dict(checkpoint)
+#         global dict_for_infer
+#         with open(os.path.join(dir_name, "dict_for_infer.pkl"), 'rb') as f:
+#             dict_for_infer = pickle.load(f)
+#         print("    ***학습 모델 로딩 완료!")
 
 
-    nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
+#     def infer(test_path, *parser):
+#         config = dict_for_infer['config']
+#         vocab = dict_for_infer['vocab']
+#         model.to('cuda')
+#         model.eval()
 
-# def _bind_model(model, optimizer=None):
-#     def save(path, *args, **kwargs):
-#         state = {
-#             'model': model.state_dict(),
-#             'optimizer': optimizer.state_dict()
-#         }
-#         torch.save(state, os.path.join(path, 'model.pt'))
-#         print('Model saved')
+#         results = []
+#         for i in glob(os.path.join(test_path, '*')): # glob이 도커에 안깔림...
+#             results.append(
+#                 {
+#                     'filename': i.split('/')[-1],
+#                     'text': custom_oneToken_infer_for_testing(model, i, vocab, config)[0]
+#                 }
+#             )
+#         return sorted(results, key=lambda x: x['filename'])
 
-#     def load(path, *args, **kwargs):
-#         state = torch.load(os.path.join(path, 'model.pt'))
-#         model.load_state_dict(state['model'])
-#         if 'optimizer' in state and optimizer:
-#             optimizer.load_state_dict(state['optimizer'])
-#         print('Model loaded')
-
-#     # 추론
-#     def infer(path, **kwargs):
-#         return inference(path, model)
 
 #     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
+def bind_model(model, optimizer=None):
+    def save(path, *args, **kwargs):
+        state = {
+            'model': model.state_dict(),
+            'optimizer': optimizer.state_dict()
+        }
+        torch.save(state, os.path.join(path, 'model.pt'))
+        print('Model saved')
+
+    def load(path, *args, **kwargs):
+        state = torch.load(os.path.join(path, 'model.pt'))
+        model.load_state_dict(state['model'])
+        if 'optimizer' in state and optimizer:
+            optimizer.load_state_dict(state['optimizer'])
+        print('Model loaded')
+
+    # 추론
+    def infer(path, **kwargs):
+        return inference(path, model)
+
+    nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
 
-# def inference(path, model, **kwargs):
-#     model.eval()
 
-#     results = []
-#     # for i in [os.path.join(path,i) for i in os.listidr(path)]:
-#     for i in glob(os.path.join(path, '*')): # glob이 도커에 안깔림...
-#         results.append(
-#             {
-#                 'filename': i.split('/')[-1],
-#                 'text': single_infer(model, i)[0]
-#             }
-#         )
-#     return sorted(results, key=lambda x: x['filename'])
+def inference(path, model, **kwargs):
+    model.eval()
+
+    results = []
+    # for i in [os.path.join(path,i) for i in os.listidr(path)]:
+    for i in glob(os.path.join(path, '*')): # glob이 도커에 안깔림...
+        results.append(
+            {
+                'filename': i.split('/')[-1],
+                'text': single_infer(model, i)[0]
+            }
+        )
+    return sorted(results, key=lambda x: x['filename'])
 
 
 
@@ -200,7 +201,7 @@ def build_model(
             model = Conformer(
                     num_classes=len(vocab), 
                     input_dim=config.n_mels, 
-                    # encoder_dim=512, 
+                    encoder_dim=512, 
                     num_encoder_layers=6,
                     feed_forward_expansion_factor = 2,
 
@@ -219,7 +220,7 @@ if __name__ == '__main__':
     args.add_argument('--iteration', type=str, default='0')
     args.add_argument('--pause', type=int, default=0)
     # Parameters 
-    args.add_argument('--version', type=str, default='train')
+    args.add_argument('--version', type=str, default='POC')
     args.add_argument('--make_bow', type=bool, default=True)
 
     args.add_argument('--use_cuda', type=bool, default=True)
@@ -424,7 +425,8 @@ if __name__ == '__main__':
                 cer_metric,
                 wer_metric,
                 train_begin_time,
-                device
+                device,
+                vocab=vocab
             )
 
             print('[INFO] Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
@@ -456,8 +458,9 @@ if __name__ == '__main__':
                 val_cer=valid_cer
             )
 
+            model_states = model.state_dict()
+
             dict_for_infer = {
-                'model' : model.state_dict(),
                 'config' : config,
                 'vocab' : vocab,
             }

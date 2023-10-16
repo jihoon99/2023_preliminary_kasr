@@ -60,6 +60,7 @@ class CustomPadFill():
         template = nn.ZeroPad2d((0,max_len-current_len,0,0))
         return template(feature)
     
+    
     def custom_target_padding1(self, targets, max_len):
         
         zero_targets = torch.zeros(self.config.batch_size, max_len).to(torch.long)
@@ -75,12 +76,10 @@ class CustomPadFill():
         features = []
         target_len = []
         feature_len = []
-        final_feature_len = []
 
         for feature, target in bs:
             # feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             feature_len += [feature.shape[-1]]
-            final_feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             target_len += [target.shape[-1]] # baseline에서는 -1을 햇음 왜그랬을까?
             targets += [target]
 
@@ -96,10 +95,17 @@ class CustomPadFill():
         features = torch.cat(features, dim=0).transpose(-1,-2)
 
 
-        final_feature_len = torch.IntTensor(final_feature_len)
+        ### 제발 되라...
+        final_feature_len = []
+        for _f in feature_len:
+            if _f > self.config.mfcc_max_len:
+                final_feature_len += [self.config.mfcc_max_len]
+            else:
+                final_feature_len += [_f]
+        feature_len = torch.IntTensor(final_feature_len)
         target_len = torch.IntTensor(target_len)
 
-        return features, targets, final_feature_len, target_len
+        return features, targets, feature_len, target_len
 
 
 class PadFill():
