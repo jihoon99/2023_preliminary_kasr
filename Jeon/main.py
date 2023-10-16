@@ -33,11 +33,14 @@ from modules.data import (
     split_dataset, 
     collate_fn,
     PadFill,
-    CustomPadFill
+    CustomPadFill,
 )
 from modules.utils import Optimizer
 from modules.metrics import get_metric
-from modules.inference import single_infer
+from modules.inference import (
+    single_infer,
+    custom_oneToken_infer_for_testing
+)
 
 from torch.utils.data import DataLoader
 import torch.nn as nn
@@ -45,53 +48,107 @@ import torch.nn as nn
 from modules.vocab import Vocabulary
 
 import pandas as pd
+import pickle
 
 import nova
 from nova import DATASET_PATH
 
 
-#from dotenv import load_dotenv # read '.env' file
-#load_dotenv()
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
 
-def bind_model(model, optimizer=None):
-    def save(path, *args, **kwargs):
-        state = {
-            'model': model.state_dict(),
-            'optimizer': optimizer.state_dict()
-        }
-        torch.save(state, os.path.join(path, 'model.pt'))
-        print('Model saved')
+def save_checkpoint(checkpoint, dir):
+    torch.save(checkpoint, os.path.join(dir))
 
-    def load(path, *args, **kwargs):
-        state = torch.load(os.path.join(path, 'model.pt'))
-        model.load_state_dict(state['model'])
-        if 'optimizer' in state and optimizer:
-            optimizer.load_state_dict(state['optimizer'])
-        print('Model loaded')
+def bind_model(model, parser):
 
-    # 추론
-    def infer(path, **kwargs):
-        return inference(path, model)
+    def save(dir_name, *parser):
+        '''
+            save trained model to nsml system
+        '''
+        os.makedirs(dir_name, exist_ok=True)
+        save_dir = os.path.join(dir_name, 'checkpoint')
+        save_checkpoint(dict_for_infer, save_dir)
+
+        with open(os.path.join(dir_name, "dict_for_infer"), "wb") as f:
+            pickle.dump(dict_for_infer, f)
+
+        print(f"학습 모델 저장 완료!")
+
+
+    def load(dir_name, *parser):
+        '''
+            load saved model from nsml system
+        '''
+        save_dir = os.path.join(dir_name, 'checkpoint')
+        global checkpoint
+        checkpoint = torch.load(save_dir)
+        model.load_state_dict(checkpoint['model'])
+        global dict_for_infer
+        with open(os.path.join(dir_name, "dict_for_infer"), 'rb') as f:
+            dict_for_infer = pickle.load(f)
+        print("    ***학습 모델 로딩 완료!")
+
+
+    def infer(test_path, **kwparser):
+        config = dict_for_infer['config']
+        vocab = dict_for_infer['vocab']
+        model.to('cuda')
+        model.eval()
+
+        results = []
+        for i in glob(os.path.join(test_path, '*')): # glob이 도커에 안깔림...
+            results.append(
+                {
+                    'filename': i.split('/')[-1],
+                    'text': custom_oneToken_infer_for_testing(model, i, vocab, config)[0]
+                }
+            )
+        return sorted(results, key=lambda x: x['filename'])
+
 
     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
+# def _bind_model(model, optimizer=None):
+#     def save(path, *args, **kwargs):
+#         state = {
+#             'model': model.state_dict(),
+#             'optimizer': optimizer.state_dict()
+#         }
+#         torch.save(state, os.path.join(path, 'model.pt'))
+#         print('Model saved')
+
+#     def load(path, *args, **kwargs):
+#         state = torch.load(os.path.join(path, 'model.pt'))
+#         model.load_state_dict(state['model'])
+#         if 'optimizer' in state and optimizer:
+#             optimizer.load_state_dict(state['optimizer'])
+#         print('Model loaded')
+
+#     # 추론
+#     def infer(path, **kwargs):
+#         return inference(path, model)
+
+#     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
 
-def inference(path, model, **kwargs):
-    model.eval()
 
-    results = []
-    # for i in [os.path.join(path,i) for i in os.listidr(path)]:
-    for i in glob(os.path.join(path, '*')): # glob이 도커에 안깔림...
-        results.append(
-            {
-                'filename': i.split('/')[-1],
-                'text': single_infer(model, i)[0]
-            }
-        )
-    return sorted(results, key=lambda x: x['filename'])
+# def inference(path, model, **kwargs):
+#     model.eval()
+
+#     results = []
+#     # for i in [os.path.join(path,i) for i in os.listidr(path)]:
+#     for i in glob(os.path.join(path, '*')): # glob이 도커에 안깔림...
+#         results.append(
+#             {
+#                 'filename': i.split('/')[-1],
+#                 'text': single_infer(model, i)[0]
+#             }
+#         )
+#     return sorted(results, key=lambda x: x['filename'])
+
+
 
 def spell_check(config):
     pass
@@ -299,7 +356,11 @@ if __name__ == '__main__':
         preprocessing(label_path, os.getcwd()) # current_path/label.csv 가 존재합니다. (git에도 제가 일부를 올렸음.) # transcript
 
         # config.version == 'POC' 일 경우, 일부 데이터만 갖고 train_dataset, valid_datset 구성됨.
-        train_dataset, valid_dataset = split_dataset(config, os.path.join(os.getcwd(), 'transcripts.txt'), vocab) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
+        train_dataset, valid_dataset = split_dataset(
+            config, 
+            os.path.join(os.getcwd(), 'transcripts.txt'), 
+            vocab
+        ) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
         
         train_loader = DataLoader(
             train_dataset,
@@ -375,7 +436,8 @@ if __name__ == '__main__':
                 criterion,
                 metric,
                 train_begin_time,
-                device
+                device,
+                vocab=vocab
             )
 
             print('[INFO] Epoch %d (Validation) Loss %0.4f  CER %0.4f' % (epoch, valid_loss, valid_cer))
@@ -388,6 +450,12 @@ if __name__ == '__main__':
                 val_loss=valid_loss,
                 val_cer=valid_cer
             )
+
+            dict_for_infer = {
+                'model' : model.state_dict(),
+                'config' : config,
+                'vocab' : vocab,
+            }
 
             if epoch % config.checkpoint_every == 0:
                 nova.save(epoch)

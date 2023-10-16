@@ -6,6 +6,7 @@ import time
 from nova import DATASET_PATH
 
 
+
 def training(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device):
 
     model.train()
@@ -69,10 +70,9 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
     return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
 
 
-def validating(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device):
+def validating(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device, vocab):
 
     model.eval()
-
 
     # log_format = "[INFO] step: {:4d}/{:4d}, loss: {:.6f}, " \
     #                           "cer: {:.2f}, elapsed: {:.2f}s {:.2f}m {:.2f}h, lr: {:.6f}"
@@ -114,8 +114,14 @@ def validating(config, dataloader, optimizer, model, criterion, metric, train_be
 
             torch.cuda.empty_cache()
 
-            if cnt % config.print_every == 0:
+            if cnt % int(config.print_every//2) == 0:
+                y_hat_decoded, targets_decoded = decoder_withoud_LM(y_hats, targets, vocab)
+                for i in range(5):
+                    print(f'y_hat_decoded : {y_hat_decoded[i]}')
+                    print(f'targets_decoded : {targets_decoded[i]}')
 
+
+            if cnt % config.print_every == 0:
                 current_time = time.time()
                 elapsed = current_time - begin_time
                 epoch_elapsed = (current_time - epoch_begin_time) / 60.0
@@ -123,7 +129,6 @@ def validating(config, dataloader, optimizer, model, criterion, metric, train_be
                 cer = metric(targets[:, 1:], y_hats)
                 
                 print(f'[INFO] VALIDATING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
-
                 # print(log_format.format(
                 #     cnt, len(dataloader), loss,
                 #     cer, elapsed, epoch_elapsed, train_elapsed,
@@ -133,8 +138,14 @@ def validating(config, dataloader, optimizer, model, criterion, metric, train_be
         return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
     
 
-def decoder():
+def decoder_withoud_LM(y_hats, targets, vocab):
     '''
     LM decoder, 혹은 그냥 decoder 구현 필요성이 있음.
     '''
+    y_hat_decoded = vocab.label_to_string(y_hats.cpu().detach().numpy())
+    targets_decoded = vocab.label_to_string(targets.cpu().detach().numpy())
+    return y_hat_decoded, targets_decoded
+
+
+def decoder_with_LM():
     pass
