@@ -45,7 +45,7 @@ def single_infer(model, audio_path):
     model.eval()
 
     model.device = device
-    y_hats = model.recognize(feature.unsqueeze(0).to(device), input_length)
+    y_hats, _ = model.recognize(feature.unsqueeze(0).to(device), input_length)
     sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
 
     return sentence
@@ -57,7 +57,7 @@ def custom_oneToken_infer(model, features, feature_lengths, targets, vocab):
         model.to('device')
 
     with torch.no_grad():
-        y_hats = model(features, feature_lengths)
+        y_hats, _ = model(features, feature_lengths)
         sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
         answer_sentence = vocab.label_to_string(targets.cpu().detach().numpy())
     return sentence, answer_sentence
@@ -69,7 +69,7 @@ def custom_oneToken_infer_validation(model, feature, feature_length, vocab):
         model.to("device")
 
     with torch.no_grad():
-        y_hats = model(feature.unsqueeze(0).to('cuda'), feature_length)
+        y_hats, _ = model(feature.unsqueeze(0).to('cuda'), feature_length)
         sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
     
     return sentence
@@ -83,7 +83,7 @@ def custom_oneToken_infer_for_testing(model, audio_path, vocab, config):
     feature = inference_wav2image_tensor(audio_path, config)
     input_length = torch.LongTensor([len(feature)])
 
-    y_hats = model(feature.unsqueeze(0).to(device), input_length)
+    y_hats, _ = model(feature.unsqueeze(0).to(device), input_length)
     sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
     return sentence
 

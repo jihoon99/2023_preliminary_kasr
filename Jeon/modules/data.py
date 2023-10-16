@@ -75,10 +75,12 @@ class CustomPadFill():
         features = []
         target_len = []
         feature_len = []
+        final_feature_len = []
 
         for feature, target in bs:
             # feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             feature_len += [feature.shape[-1]]
+            final_feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             target_len += [target.shape[-1]] # baseline에서는 -1을 햇음 왜그랬을까?
             targets += [target]
 
@@ -89,15 +91,15 @@ class CustomPadFill():
             #targets += [self.custom_target_padding1(target, max_target_len, current_target_len)]
             features += [self.custom_feature_padding(feature, max_feature_len, current_feature_len).unsqueeze(0)]
 
-
         targets = self.custom_target_padding1(targets, max_target_len)
         #targets = torch.cat(targets, dim=0)
         features = torch.cat(features, dim=0).transpose(-1,-2)
 
-        feature_len = torch.IntTensor(feature_len)
+
+        final_feature_len = torch.IntTensor(final_feature_len)
         target_len = torch.IntTensor(target_len)
 
-        return features, targets, feature_len, target_len
+        return features, targets, final_feature_len, target_len
 
 
 class PadFill():

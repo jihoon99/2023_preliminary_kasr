@@ -68,10 +68,10 @@ def bind_model(model, parser):
             save trained model to nsml system
         '''
         os.makedirs(dir_name, exist_ok=True)
-        save_dir = os.path.join(dir_name, 'checkpoint')
-        save_checkpoint(dict_for_infer, save_dir)
+        save_dir = os.path.join(dir_name, 'model_checkpoint')
+        save_checkpoint(dict_for_infer['model'], save_dir)
 
-        with open(os.path.join(dir_name, "dict_for_infer"), "wb") as f:
+        with open(os.path.join(dir_name, "dict_for_infer.pkl"), "wb") as f:
             pickle.dump(dict_for_infer, f)
 
         print(f"학습 모델 저장 완료!")
@@ -81,17 +81,17 @@ def bind_model(model, parser):
         '''
             load saved model from nsml system
         '''
-        save_dir = os.path.join(dir_name, 'checkpoint')
+        save_dir = os.path.join(dir_name, 'model_checkpoint')
         global checkpoint
         checkpoint = torch.load(save_dir)
-        model.load_state_dict(checkpoint['model'])
+        model.load_state_dict(checkpoint)
         global dict_for_infer
-        with open(os.path.join(dir_name, "dict_for_infer"), 'rb') as f:
+        with open(os.path.join(dir_name, "dict_for_infer.pkl"), 'rb') as f:
             dict_for_infer = pickle.load(f)
         print("    ***학습 모델 로딩 완료!")
 
 
-    def infer(test_path, **kwparser):
+    def infer(test_path, *parser):
         config = dict_for_infer['config']
         vocab = dict_for_infer['vocab']
         model.to('cuda')
@@ -344,9 +344,11 @@ if __name__ == '__main__':
 
     # load optimizer
     optimizer = get_optimizer(model, config)
-    bind_model(model, optimizer=optimizer)
+    # bind_model(model, optimizer=optimizer)
+    bind_model(model, config)
+
     cer_metric = get_metric(metric_name='CER', vocab=vocab) #####################  다른 평가 지표 추가해야함.
-    wer_metric = get_metric(metric_name='WER', vocab=vocab)
+    wer_metric = get_metric(metric_name='WER', vocab=vocab) # no working
 
     if config.pause:
         nova.paused(scope=locals())

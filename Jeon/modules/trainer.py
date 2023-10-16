@@ -66,7 +66,8 @@ def training(
             epoch_elapsed = (current_time - epoch_begin_time) / 60.0    # 아 초, 단위로 한거구나.
             train_elapsed = (current_time - train_begin_time) / 3600.0  # 시간 단위로 변환한거구나.
             cer = cer_metric(targets[:, 1:], y_hats)
-            wer = wer_metric(targets[:, 1:], y_hats)
+            #wer = wer_metric(targets[:, 1:], y_hats)
+            wer = 0
 
             print(f'[INFO] TRAINING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, wer : {wer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
                 
@@ -146,7 +147,8 @@ def validating(
                 epoch_elapsed = (current_time - epoch_begin_time) / 60.0
                 train_elapsed = (current_time - train_begin_time) / 3600.0
                 cer = cer_metric(targets[:, 1:], y_hats)
-                wer = wer_metric(targets[:, 1:], y_hats)
+                # wer = wer_metric(targets[:, 1:], y_hats)
+                wer = 0
                 
                 print(f'[INFO] VALIDATING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, wer : {wer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
                 # print(log_format.format(
