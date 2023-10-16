@@ -16,6 +16,8 @@
 def get_metric(metric_name, vocab):
     if metric_name == 'CER':
         return CharacterErrorRate(vocab)
+    elif metric_name == 'WER':
+        return WordErrorRate(vocab)
     else:
         raise ValueError('Unsupported metric: {0}'.format(metric_name))
 

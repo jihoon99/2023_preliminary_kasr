@@ -7,7 +7,16 @@ from nova import DATASET_PATH
 
 
 
-def training(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device):
+def training(
+        config, 
+        dataloader,
+        optimizer, 
+        model, 
+        criterion, 
+        cer_metric,
+        wer_metric,
+        train_begin_time, 
+        device):
 
     model.train()
 
@@ -56,10 +65,10 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
             elapsed = current_time - begin_time
             epoch_elapsed = (current_time - epoch_begin_time) / 60.0    # 아 초, 단위로 한거구나.
             train_elapsed = (current_time - train_begin_time) / 3600.0  # 시간 단위로 변환한거구나.
-            cer = metric(targets[:, 1:], y_hats)
+            cer = cer_metric(targets[:, 1:], y_hats)
+            wer = wer_metric(targets[:, 1:], y_hats)
 
-
-            print(f'[INFO] TRAINING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
+            print(f'[INFO] TRAINING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, wer : {wer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
                 
             # print(log_format.format(
             #     cnt, len(dataloader), loss,
@@ -67,10 +76,20 @@ def training(config, dataloader, optimizer, model, criterion, metric, train_begi
             #     # optimizer.get_lr(),
             # ))
         cnt += 1
-    return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
+    return model, epoch_loss_total/len(dataloader), cer_metric(targets[:, 1:], y_hats)
 
 
-def validating(config, dataloader, optimizer, model, criterion, metric, train_begin_time, device, vocab):
+def validating(
+        config, 
+        dataloader, 
+        optimizer, 
+        model, 
+        criterion, 
+        cer_metric, 
+        wer_metric,
+        train_begin_time, 
+        device, 
+        vocab):
 
     model.eval()
 
@@ -126,16 +145,17 @@ def validating(config, dataloader, optimizer, model, criterion, metric, train_be
                 elapsed = current_time - begin_time
                 epoch_elapsed = (current_time - epoch_begin_time) / 60.0
                 train_elapsed = (current_time - train_begin_time) / 3600.0
-                cer = metric(targets[:, 1:], y_hats)
+                cer = cer_metric(targets[:, 1:], y_hats)
+                wer = wer_metric(targets[:, 1:], y_hats)
                 
-                print(f'[INFO] VALIDATING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
+                print(f'[INFO] VALIDATING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, wer : {wer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
                 # print(log_format.format(
                 #     cnt, len(dataloader), loss,
                 #     cer, elapsed, epoch_elapsed, train_elapsed,
                 #     # optimizer.get_lr(),
                 # ))
             cnt += 1
-        return model, epoch_loss_total/len(dataloader), metric(targets[:, 1:], y_hats)
+        return model, epoch_loss_total/len(dataloader), cer_metric(targets[:, 1:], y_hats)
     
 
 def decoder_withoud_LM(y_hats, targets, vocab):

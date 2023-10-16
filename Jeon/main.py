@@ -345,7 +345,8 @@ if __name__ == '__main__':
     # load optimizer
     optimizer = get_optimizer(model, config)
     bind_model(model, optimizer=optimizer)
-    metric = get_metric(metric_name='CER', vocab=vocab) #####################  다른 평가 지표 추가해야함.
+    cer_metric = get_metric(metric_name='CER', vocab=vocab) #####################  다른 평가 지표 추가해야함.
+    wer_metric = get_metric(metric_name='WER', vocab=vocab)
 
     if config.pause:
         nova.paused(scope=locals())
@@ -418,7 +419,8 @@ if __name__ == '__main__':
                 optimizer,
                 model,
                 criterion,
-                metric,
+                cer_metric,
+                wer_metric,
                 train_begin_time,
                 device
             )
@@ -434,7 +436,8 @@ if __name__ == '__main__':
                 optimizer,
                 model,
                 criterion,
-                metric,
+                cer_metric,
+                wer_metric,
                 train_begin_time,
                 device,
                 vocab=vocab
