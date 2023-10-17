@@ -7,102 +7,27 @@ import time
 import json
 import argparse
 from glob import glob
-
-from modules.preprocess import preprocessing
-from modules.trainer import (
-    training,
-    validating,
-)
-from modules.utils import (
-    get_optimizer,
-    get_criterion,
-    get_lr_scheduler,
-)
-# from modules.audio import (
-#     FilterBankConfig,
-#     MelSpectrogramConfig,
-#     MfccConfig,
-#     SpectrogramConfig,
-# )
-# from modules.model import build_model
-from modules.model.deepspeech2 import build_deepspeech2
-from modules.model.conformer.model import Conformer
-
-from modules.vocab import KoreanSpeechVocabulary
-from modules.data import (
-    UniformLengthBatchingSampler,
-    split_dataset, 
-    split_dataset_1,
-    collate_fn,
-    PadFill,
-    CustomPadFill,
-)
-from modules.utils import Optimizer
-from modules.metrics import get_metric
-from modules.inference import (
-    single_infer,
-    custom_oneToken_infer_for_testing
+from datasets import load_dataset, Audio
+from transformers import (
+    AutoProcessor, 
+    Wav2Vec2Processor, 
+    Wav2Vec2ForCTC, 
+    Wav2Vec2CTCTokenizer
 )
 
-from torch.utils.data import (DataLoader, SequentialSampler)
+from torch.utils.data import DataLoader
 import torch.nn as nn
-
-from modules.vocab import Vocabulary
 
 import pandas as pd
 import pickle
+
+from modules.vocab import KoreanSpeechVocabulary
 
 import nova
 from nova import DATASET_PATH
 
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-def preprocess_1(
-        label_path, 
-        config,
-        token_label = os.path.join(os.getcwd(), 'labels.csv'),
-        ):
-    
-
-    def load_label(filepath = 'labels.csv'):
-        char2id = dict()
-        id2char = dict()
-
-        ch_labels = pd.read_csv(filepath, encoding="utf-8")
-
-        id_list = ch_labels["id"]
-        char_list = ch_labels["char"]
-        freq_list = ch_labels["freq"]
-
-        for (id_, char, freq) in zip(id_list, char_list, freq_list):
-            char2id[char] = id_
-            id2char[id_] = char
-        return char2id, id2char
-    
-    def sentence_to_target(sentence, char2id):
-        target = []
-
-        for ch in sentence:
-            try:
-                target += [char2id[ch]]
-            except KeyError:
-                continue
-
-        return target
-
-    df =  pd.read_csv(label_path)
-    char2id, id2char = load_label(token_label)
-    # char_id_transcript = sentence_to_target(df, char2id)
-
-    df['filename'] = config.dataset_path + '/' + df['filename']
-    df['sentence_to_char'] = df['text'].apply(lambda x: [1] + sentence_to_target(x, char2id) + [2]) # sos, eos token
-    df['len_text'] = df['sentence_to_char'].apply(lambda x: len(x))
-
-    if config.ignore_n_character:
-        df = df[df['len_text'] >= (config.n_character + 2)].reset_index(drop=True)
-
-    return df
 
 
 def save_checkpoint(checkpoint, dir):
@@ -158,39 +83,31 @@ def save_checkpoint(checkpoint, dir):
 
 #     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
-def bind_model(model, config, optimizer=None):
+def bind_model(model, optimizer=None):
     def save(path, *args, **kwargs):
         state = {
             'model': model.state_dict(),
             'optimizer': optimizer.state_dict()
         }
         torch.save(state, os.path.join(path, 'model.pt'))
-
-        with open(os.path.join(path, "config.pkl"), "wb") as f:
-            pickle.dump(config, f)
-
-        print('Model and config saved')
-
+        print('Model saved')
 
     def load(path, *args, **kwargs):
         state = torch.load(os.path.join(path, 'model.pt'))
         model.load_state_dict(state['model'])
         if 'optimizer' in state and optimizer:
             optimizer.load_state_dict(state['optimizer'])
-
-        with open(os.path.join(path, "config.pkl"), 'rb') as f:
-            dict_for_infer = pickle.load(f)
         print('Model loaded')
 
     # 추론
     def infer(path, **kwargs):
-        return inference(path, model, config)
+        return inference(path, model)
 
     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
 
 
-def inference(path, model, config, **kwargs):
+def inference(path, model, **kwargs):
     model.eval()
 
     results = []
@@ -236,7 +153,7 @@ def build_model(
         config,
         vocab: Vocabulary,
         device: torch.device,
-):
+) -> nn.DataParallel:
 
     if config.architecture == 'deepspeech2':
         # 모델 안에 이미 멀티 지피유 사용함.
@@ -276,7 +193,6 @@ if __name__ == '__main__':
     args.add_argument('--pause', type=int, default=0)
     # Parameters 
     args.add_argument('--version', type=str, default='POC')
-    args.add_argument('--make_bow', type=bool, default=True)
 
     args.add_argument('--use_cuda', type=bool, default=True)
     args.add_argument('--seed', type=int, default=777)
@@ -291,10 +207,6 @@ if __name__ == '__main__':
     args.add_argument('--output_unit', type=str, default='character')    # check
 
     # Data Processing
-    args.add_argument('--ignore_n_character', default=True)
-    args.add_argument('--n_character', default=True)
-
-
     args.add_argument('--audio_extension', type=str, default='wav')
     args.add_argument('--transform_method', type=str, default='fbank')
     args.add_argument('--feature_extract_by', type=str, default='kaldi')
@@ -323,11 +235,11 @@ if __name__ == '__main__':
     args.add_argument('--num_threads', type=int, default=16)
     
     # optimizer
-    args.add_argument('--optimizer', type=str, default='RMSprop')       # adam, rmsprop, Radam
+    args.add_argument('--optimizer', type=str, default='adam')      
 
     # Optimizer lr scheduler options
     args.add_argument("--constant_lr", default=5e-5) #default=5e-5)  # when this is False:   아래의 옵션들이 실행됨.
-    args.add_argument('--use_lr_scheduler', type=bool, default=True) ## 
+    args.add_argument('--use_lr_scheduler', type=bool, default=False) ## 
     args.add_argument('--lr_scheduler', type=str, default='tri_stage_lr_scheduler')
     args.add_argument('--init_lr', type=float, default=1e-06)
     args.add_argument('--final_lr', type=float, default=1e-06)
@@ -378,7 +290,7 @@ if __name__ == '__main__':
     if hasattr(config, "num_threads") and int(config.num_threads) > 0:
         torch.set_num_threads(config.num_threads)
 
-    # vocab class 선언, str to idx, idx to str 있음.
+    # vocab 사전 가지고와 / 사전 csv 파일 열어서, pad, sos, eos, blank_id, unk_id 바꿔.
     vocab = load_vocab(
         config,
         sos_id = '<s>',
@@ -398,14 +310,17 @@ if __name__ == '__main__':
         vocab=vocab, 
         device=device)
 
+    print(model)
     print('build model success')
     print("-"*100)
 
     # load optimizer
     optimizer = get_optimizer(model, config)
-    bind_model(model, optimizer=optimizer, config=config)
+    # bind_model(model, optimizer=optimizer)
+    bind_model(model, config)
 
     cer_metric = get_metric(metric_name='CER', vocab=vocab) #####################  다른 평가 지표 추가해야함.
+    wer_metric = get_metric(metric_name='WER', vocab=vocab) # no working
 
     if config.pause:
         nova.paused(scope=locals())
@@ -413,29 +328,20 @@ if __name__ == '__main__':
     if config.mode == 'train':
         config.dataset_path = os.path.join(DATASET_PATH, 'train', 'train_data') # 트레이닝 데이터 셋 위치 
         label_path = os.path.join(DATASET_PATH, 'train', 'train_label')         # 정답지 위치 : train_label이 csv인가 봅니다. -> columns : audio_path, transcript(sentence)
-        
-        df = preprocess_1(label_path=label_path, config=config)
-
+        preprocessing(label_path, os.getcwd()) # current_path/label.csv 가 존재합니다. (git에도 제가 일부를 올렸음.) # transcript
 
         # config.version == 'POC' 일 경우, 일부 데이터만 갖고 train_dataset, valid_datset 구성됨.
-        train_dataset, valid_dataset = split_dataset_1(
-            df, 
-            config,
-            valid_size=.15
+        train_dataset, valid_dataset = split_dataset(
+            config, 
+            os.path.join(os.getcwd(), 'transcripts.txt'), 
+            vocab
         ) # data 부분에서 무음 처리 하는 부분과 broadcasting 부분 바꿔야함.
         
-        # train_sampler = UniformLengthBatchingSampler(train_dataset, batch_size=config.batch_size)
-        # valid_sampler = UniformLengthBatchingSampler(valid_dataset, batch_size=config.batch_size)
-        train_sampler = SequentialSampler(train_dataset)
-        # valid_sampler = SequentialSampler(valid_dataset)
-
-
         train_loader = DataLoader(
             train_dataset,
-            sampler = train_sampler,
             batch_size=config.batch_size,
-            # shuffle=True,
-            collate_fn=CustomPadFill(0,config),            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
+            shuffle=True,
+            collate_fn=CustomPadFill(2001,config),            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
             num_workers=config.num_workers,
             drop_last=True
         )
@@ -443,8 +349,8 @@ if __name__ == '__main__':
         valid_loader = DataLoader(
             valid_dataset,
             batch_size=config.batch_size,
-            # shuffle=True,
-            collate_fn=CustomPadFill(0, config),
+            shuffle=True,
+            collate_fn=CustomPadFill(2001, config),
             num_workers=config.num_workers,
             drop_last=True
         )
@@ -488,7 +394,7 @@ if __name__ == '__main__':
                 model,
                 criterion,
                 cer_metric,
-                'wer_metric',
+                wer_metric,
                 train_begin_time,
                 device,
                 vocab=vocab
@@ -506,7 +412,7 @@ if __name__ == '__main__':
                 model,
                 criterion,
                 cer_metric,
-                'wer_metric',
+                wer_metric,
                 train_begin_time,
                 device,
                 vocab=vocab
@@ -525,6 +431,10 @@ if __name__ == '__main__':
 
             model_states = model.state_dict()
 
+            dict_for_infer = {
+                'config' : config,
+                'vocab' : vocab,
+            }
 
             if epoch % config.checkpoint_every == 0:
                 nova.save(epoch)

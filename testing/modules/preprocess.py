@@ -129,7 +129,7 @@ def generate_character_script(data_df, labels_dest):
 
 
 def preprocessing(transcripts_dest, labels_dest):
-    transcript_df = pd.read_csv(transcripts_dest) # 
+    transcript_df = pd.read_csv(transcripts_dest)
     generate_character_script(transcript_df, labels_dest)
 
     print('[INFO] Preprocessing is Done')

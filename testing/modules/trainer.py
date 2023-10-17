@@ -88,7 +88,7 @@ def training(
         # batch 128 크다 그러니까 : cumulate backward step 방법론 생각해봄직함. 
         optimizer.zero_grad()
         loss.backward()
-        optimizer.step(model)
+        optimizer.step()
 
         total_num += int(input_lengths.sum())
         epoch_loss_total += loss.item()

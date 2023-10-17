@@ -9,7 +9,8 @@ import math
 import pydub
 
 from torch import Tensor
-from torch.utils.data import (Dataset, Sampler, DataLoader)
+from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
 
 from sklearn.model_selection import train_test_split
 
@@ -77,10 +78,9 @@ class CustomPadFill():
         feature_len = []
 
         for feature, target in bs:
-            # target = torch.tensor(target).long()
             # feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
             feature_len += [feature.shape[-1]]
-            target_len += [target.shape[-1]] # baseline에서는 -1을 햇음 왜그랬을까?
+            target_len += [target.shape[-1]-1] # baseline에서는 -1을 햇음 왜그랬을까?
             targets += [target]
 
         max_feature_len = min(max(feature_len), self.config.mfcc_max_len)
@@ -512,156 +512,6 @@ def split_dataset(
     )
 
     return train_dataset, valid_dataset
-
-
-
-def split_dataset_1(
-        df,
-        config, 
-        valid_size=.15):
-    """
-    split into training set and validation set.
-
-    Args:
-        opt (ArgumentParser): set of options
-        transcripts_path (str): path of  transcripts
-
-    Returns: train_batch_num, train_dataset_list, valid_dataset
-        - **train_time_step** (int): number of time step for training
-        - **trainset_list** (list): list of training dataset
-        - **validset** (data_loader.MelSpectrogramDataset): validation dataset
-    """
-
-
-    print("split dataset start !!")
-
-
-    if config.version == 'POC':
-        df = df.iloc[:1000]
-
-
-    def train_valid_split(df, valid_ratio=valid_size):
-        train=df.sample(
-            frac=1-valid_ratio,
-            random_state=200)
-        valid=df.drop(train.index)
-        return train, valid
-
-    train, valid = train_valid_split(df)
-    train = train.sort_values("len_text").reset_index(drop = True)
-    valid = valid.sort_values("len_text").reset_index(drop = True)
-
-    train_dataset = CustomDataset_1(
-        train,
-        config=config,
-    )
-
-    valid_dataset = CustomDataset_1(
-        valid,
-        config=config,
-    )
-
-    return train_dataset, valid_dataset
-
-
-
-
-
-class CustomDataset_1(Dataset):
-    """
-    Dataset for feature & transcript matching
-
-    Args:
-        audio_paths (list): list of audio path
-        transcripts (list): list of transcript
-        sos_id (int): identification of <start of sequence>
-        eos_id (int): identification of <end of sequence>
-        spec_augment (bool): flag indication whether to use spec-augmentation or not (default: True)
-        config (DictConfig): set of configurations
-        dataset_path (str): path of dataset
-    """
-
-    def __init__(
-            self,
-            df,
-            config,  # set of arguments
-    ):
-        super().__init__()
-        self.df = df.reset_index(drop=True)
-        self.config = config
-
-    def wav2image_tensor(self, path):
-        audio, sr = librosa.load(path, sr=self.config.sample_rate)
-        audio, _ = librosa.effects.trim(audio)
-
-        if self.config.remove_noise:
-            audio = remove_noise_data(audio)
-
-        if self.config.del_silence:
-            audio = detect_silence(
-                audio,
-                audio_threshold=self.config.audio_threshold,
-                min_silence_len=self.config.min_silence_len,
-                ratio = self.config.sample_rate,
-                make_silence_len=self.config.make_silence_len
-                )
-        ######### 하드 코딩 된 부분들
-        mfcc = librosa.feature.mfcc(
-            y = audio, 
-            sr=self.config.sample_rate, 
-            n_mfcc=self.config.n_mels, 
-            n_fft=400, 
-            hop_length=160
-        )
-
-        # max_len = 1000
-        mfcc = sklearn.preprocessing.scale(mfcc, axis=1)
-        mfcc = torch.tensor(mfcc, dtype=torch.float)
-        return mfcc
-    
-    def __getitem__(self, idx):
-        semi_df = self.df.iloc[idx]
-        _file_path = semi_df['filename']
-        sentence_to_chars = torch.tensor(semi_df['sentence_to_char']).long()
-        mfccs = self.wav2image_tensor(
-                _file_path
-                )
-
-        # sentence_to_chars = []
-        # mfccs = []
-        # for _file_path, _sentence_to_char in zip(semi_df['filename'], semi_df['sentence_to_char']):
-
-        #     feature = self.wav2image_tensor(
-        #         _file_path
-        #         )
-        #     mfccs += [feature]
-        #     sentence_to_chars += [torch.tensor(_sentence_to_char).long()]
-
-        return mfccs, sentence_to_chars # feature : spectogram audio, trasncript : list contain tokens
-
-    def __len__(self):
-        return len(self.df)
-
-# https://sooftware.io/uniform_length_batching/
-class UniformLengthBatchingSampler(Sampler):
-    def __init__(self, data_source: torch.utils.data.Dataset, batch_size=1):
-        super(UniformLengthBatchingSampler, self).__init__(data_source)
-        self.data_source = data_source
-        #
-        # 여기에 토큰 길이 기준으로 sorting하는 로직만 추가해주면 끝
-        #
-        ids = list(range(0, len(data_source)))
-        self.bins = [ids[i:i + batch_size] for i in range(0, len(ids), batch_size)]
-
-    def __iter__(self):
-        for ids in self.bins:
-            yield ids
-
-    def __len__(self):
-        return len(self.bins)
-
-    def shuffle(self, epoch):
-        np.random.shuffle(self.bins)
 
 
 def collate_fn(batch):

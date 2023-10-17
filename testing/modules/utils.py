@@ -177,9 +177,7 @@ def get_optimizer(model: nn.Module, config):
         _optim = optim.Adam
     elif config.optimizer == 'Radam':
         pass ################################################################## 구현 필요
-    elif config.optimizer == 'RMSprop':
-        _optim = optim.RMSprop
-    
+
     if config.weight_decay:
         return _optim(
             model.parameters(),
