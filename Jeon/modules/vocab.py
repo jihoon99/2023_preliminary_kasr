@@ -25,6 +25,7 @@ class KoreanSpeechVocabulary(Vocabulary):
                  eos_id = '</s>',
                  pad_id = '[pad]',
                  blank_id = '<blank>',
+                 if_add_blank_id = False
                 #  unk_id = '[unk]'
                  ):
         super(KoreanSpeechVocabulary, self).__init__()
@@ -33,7 +34,9 @@ class KoreanSpeechVocabulary(Vocabulary):
         vocab_df['char'][vocab_df['char'] == '<sos>'] = sos_id
         vocab_df['char'][vocab_df['char'] == '<eos>'] = eos_id
         vocab_df['char'][vocab_df['char'] == '<pad>'] = pad_id
-        self.blank = blank_id
+        self.if_add_blank_id = if_add_blank_id
+        if if_add_blank_id:
+            self.blank = blank_id
         # vocab_df['char'][vocab_df['char'] == '<blank>'] = blank_id # load_vocab에서 black를 만드네
 
         # try:
@@ -42,12 +45,12 @@ class KoreanSpeechVocabulary(Vocabulary):
         #     vocab_df = vocab_df.append(pd.DataFrame([len(vocab_df), unk_id, 0], columns = ['id','char','freq']))
         vocab_df.to_csv(vocab_path.split(",")[0] + '_edit.csv', index=False)
 
-
         self.vocab_dict, self.id_dict = self.load_vocab(vocab_path.split(",")[0] + '_edit.csv', encoding='utf-8')
         self.sos_id = int(self.vocab_dict[sos_id])
         self.eos_id = int(self.vocab_dict[eos_id])
         self.pad_id = int(self.vocab_dict[pad_id])
-        self.blank_id = int(self.vocab_dict[blank_id])
+        if if_add_blank_id:
+            self.blank_id = int(self.vocab_dict[blank_id])
         # self.unk_id = int(self.vocab_dict[unk_id])
         self.labels = self.vocab_dict.keys()
 
@@ -115,6 +118,7 @@ class KoreanSpeechVocabulary(Vocabulary):
                     unit2id[row[1]] = row[0]
                     id2unit[int(row[0])] = row[1]
 
+            if self.if_add_blank_id:
                 unit2id[self.blank] = len(unit2id)
                 id2unit[len(unit2id)] = self.blank
 

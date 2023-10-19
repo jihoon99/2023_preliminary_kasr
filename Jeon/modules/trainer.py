@@ -21,7 +21,8 @@ def training(
         wer_metric,
         train_begin_time, 
         device,
-        vocab):
+        vocab,
+        decoder):
 
     model.train()
 
@@ -74,14 +75,13 @@ def training(
 
         input_lengths = testing_pred_lengths(outputs)
 
-        
-
         loss = criterion(
             outputs.log_softmax(-1).transpose(0, 1),
             targets[:, 1:],
             tuple(input_lengths),
             tuple(target_lengths-1)
             )
+
 
         y_hats = outputs.max(-1)[1]
 
@@ -107,19 +107,26 @@ def training(
             elapsed = current_time - begin_time
             epoch_elapsed = (current_time - epoch_begin_time) / 60.0    # 아 초, 단위로 한거구나.
             train_elapsed = (current_time - train_begin_time) / 3600.0  # 시간 단위로 변환한거구나.
-            cer = cer_metric(targets[:, 1:], y_hats)
+            _targets = targets[:,1:]
+            _targets = [decoder.decode(t) for t in _targets] 
+            _y_hats = [decoder.decode(y_) for y_ in y_hats]
+            cer = cer_metric.compute(references=_targets, predictions=_y_hats)
             #wer = wer_metric(targets[:, 1:], y_hats)
             wer = 0
 
             print(f'[INFO] TRAINING step : {cnt:4d}/{len(dataloader):4d}, loss : {loss:.6f}, cer : {cer:.2f}, wer : {wer:.2f}, elapsed : {elapsed:.2f}s {epoch_elapsed:.2f}m {train_elapsed:.2f}h')
-                
+            print('-'*100)
+            print(_targets[0])
+            print(_y_hats[0])
+            print('-'*100)
+
             # print(log_format.format(
             #     cnt, len(dataloader), loss,
             #     cer, elapsed, epoch_elapsed, train_elapsed,
             #     # optimizer.get_lr(),
             # ))
         cnt += 1
-    return model, epoch_loss_total/len(dataloader), cer_metric(targets[:, 1:], y_hats)
+    return model, epoch_loss_total/len(dataloader), cer
 
 
 def validating(
@@ -132,7 +139,8 @@ def validating(
         wer_metric,
         train_begin_time, 
         device, 
-        vocab):
+        vocab,
+        decoder):
 
     model.eval()
 
@@ -167,6 +175,7 @@ def validating(
                 tuple(target_lengths-1)
             )
 
+
             y_hats = outputs.max(-1)[1]
 
             # if mode == 'train':
@@ -193,7 +202,12 @@ def validating(
                 elapsed = current_time - begin_time
                 epoch_elapsed = (current_time - epoch_begin_time) / 60.0
                 train_elapsed = (current_time - train_begin_time) / 3600.0
-                cer = cer_metric(targets[:, 1:], y_hats)
+
+                _targets = targets[:,1:]
+                _targets = [decoder.decode(t) for t in _targets] 
+                _y_hats = [decoder.decode(y_) for y_ in y_hats]
+                cer = cer_metric.compute(references=_targets, predictions=_y_hats)
+
                 # wer = wer_metric(targets[:, 1:], y_hats)
                 wer = 0
                 
@@ -203,8 +217,13 @@ def validating(
                 #     cer, elapsed, epoch_elapsed, train_elapsed,
                 #     # optimizer.get_lr(),
                 # ))
+                print('-'*100)
+                print(_targets[0])
+                print(_y_hats[0])
+                print('-'*100)
+
             cnt += 1
-        return model, epoch_loss_total/len(dataloader), cer_metric(targets[:, 1:], y_hats)
+        return model, epoch_loss_total/len(dataloader), cer
     
 
 def decoder_withoud_LM(y_hats, targets, vocab):

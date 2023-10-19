@@ -36,16 +36,25 @@ from modules.data import (
     collate_fn,
     PadFill,
     CustomPadFill,
+    inferCustomPadFill,
+    inferDataset,
+
 )
 from modules.utils import Optimizer
 from modules.metrics import get_metric
+from evaluate import load
+
+
 from modules.inference import (
     single_infer,
-    custom_oneToken_infer_for_testing
+    custom_oneToken_infer_for_testing,
+    load_simple_decoder,
+    custom_oneToken_infer_for_testing_dataloader
 )
 
-from torch.utils.data import (DataLoader, SequentialSampler)
+from torch.utils.data import (DataLoader, SequentialSampler, BatchSampler)
 import torch.nn as nn
+from transformers import Wav2Vec2CTCTokenizer
 
 from modules.vocab import Vocabulary
 
@@ -179,19 +188,29 @@ def bind_model(model, config, optimizer=None):
             optimizer.load_state_dict(state['optimizer'])
 
         with open(os.path.join(path, "config.pkl"), 'rb') as f:
-            dict_for_infer = pickle.load(f)
+            config = pickle.load(f)
         print('Model loaded')
 
     # 추론
     def infer(path, **kwargs):
-        return inference(path, model, config)
+        return customInference(path, model, config)
 
     nova.bind(save=save, load=load, infer=infer)  # 'nova.bind' function must be called at the end.
 
+def save_unit2id_json(open_fn, save_fn='unit2id.json', blank_as_pad = True):
+    if blank_as_pad:
+        aa = pd.read_csv(open_fn)
+        unit2id = aa[['id','char']].set_index("char").to_dict()['id']
+
+        with open(save_fn, 'w') as f:
+            json.dump(unit2id, f)
+    else:
+        pass # read unit2id and save
 
 
 def inference(path, model, config, **kwargs):
     model.eval()
+    _ = '' #none
 
     results = []
     # for i in [os.path.join(path,i) for i in os.listidr(path)]:
@@ -199,11 +218,42 @@ def inference(path, model, config, **kwargs):
         results.append(
             {
                 'filename': i.split('/')[-1],
-                'text': single_infer(model, i)[0]
+                'text': custom_oneToken_infer_for_testing(model, i, _, config)
             }
         )
     return sorted(results, key=lambda x: x['filename'])
 
+def customInference(path, model, config, **kwargs):
+    model.eval()
+    _ = ''
+
+    def make_datafrmae(path, config):
+        listdir = glob(os.path.join(path), '*')
+        df = pd.DataFrame(listdir, columns = ['filename'])
+        return df
+    
+
+    df = make_datafrmae(path, config)
+    _inferDataset = inferDataset(df)
+    inferenceDataLoader = DataLoader(_inferDataset,
+                                     batch_sampler=config.batch_siae,
+                                     shuffle=False,
+                                     collate_fn=inferCustomPadFill(0,config),
+                                     num_workers=config.num_workers,
+                                     drop_last=False)
+
+    results = []
+    for feature, filename, feature_len in inferenceDataLoader:
+        sentences = custom_oneToken_infer_for_testing_dataloader(model, feature, feature_len, config)
+        for _f, _s in zip(filename, sentences):
+            results += [
+                {
+                    'filename' : _f.split('/')[-1],
+                    'text' : _s
+                }
+            ]
+
+    return sorted(results, key=lambda x: x['filename'])
 
 
 def spell_check(config):
@@ -216,19 +266,26 @@ def load_vocab(
         pad_id = '[pad]',
         blank_id = '<blank>',
         # unk_id = '[unk]',
-        out_path = 'labels.csv'
+        out_path = 'labels.csv',
+        if_add_blank_id = False
     ):
+
+    vocab_path = os.path.join(os.getcwd(), out_path)
+
     vocab = KoreanSpeechVocabulary(
-        os.path.join(os.getcwd(), out_path), 
+        vocab_path, 
         output_unit='character',
         sos_id = sos_id,
         eos_id = eos_id,
         pad_id = pad_id,
         blank_id = blank_id,
+        if_add_blank_id=if_add_blank_id,
         # unk_id = unk_id
         )
         
-    return vocab # class it self
+    unit2id, id2unit = vocab.load_vocab(vocab_path.split(",")[0] + '_edit.csv', encoding='utf-8')
+    
+    return vocab, unit2id, id2unit
 
 
 def build_model(
@@ -257,7 +314,7 @@ def build_model(
                     num_classes=len(vocab), 
                     input_dim=config.n_mels, 
                     encoder_dim=512, 
-                    num_encoder_layers=6,
+                    num_encoder_layers=8,
                     feed_forward_expansion_factor = 2,
 
             ).to(device)
@@ -275,12 +332,12 @@ if __name__ == '__main__':
     args.add_argument('--iteration', type=str, default='0')
     args.add_argument('--pause', type=int, default=0)
     # Parameters 
-    args.add_argument('--version', type=str, default='POC')
+    args.add_argument('--version', type=str, default='train')
     args.add_argument('--make_bow', type=bool, default=True)
 
     args.add_argument('--use_cuda', type=bool, default=True)
     args.add_argument('--seed', type=int, default=777)
-    args.add_argument('--num_epochs', type=int, default=5)
+    args.add_argument('--num_epochs', type=int, default=30)
     args.add_argument('--batch_size', type=int, default=16)
 
     args.add_argument('--save_result_every', type=int, default=2) # 2 
@@ -292,7 +349,7 @@ if __name__ == '__main__':
 
     # Data Processing
     args.add_argument('--ignore_n_character', default=True)
-    args.add_argument('--n_character', default=True)
+    args.add_argument('--n_character', default=4)
 
 
     args.add_argument('--audio_extension', type=str, default='wav')
@@ -362,7 +419,7 @@ if __name__ == '__main__':
     config = args.parse_args()
 
     if config.version == 'POC':
-        config.num_epochs = 1
+        config.num_epochs = 2
 
     warnings.filterwarnings('ignore')
 
@@ -379,16 +436,34 @@ if __name__ == '__main__':
         torch.set_num_threads(config.num_threads)
 
     # vocab class 선언, str to idx, idx to str 있음.
-    vocab = load_vocab(
+    vocab, unit2id, id2unit = load_vocab(
         config,
         sos_id = '<s>',
         eos_id = '</s>',
         pad_id = '[pad]',
         blank_id = '<blank>',
+        if_add_blank_id=False
         # unk_id = '[unk]'
     )
+    # unit2id
+    # ctc's blank = pad  - huggingface에서는 pad랑 black를 같은걸로 보고 있네..?
+    
+    SAVE_VOCAB_JSON_PATH = os.path.join(os.getcwd(),'unit2id.json')
+    config.vocab_json_fn = SAVE_VOCAB_JSON_PATH
+    save_unit2id_json(
+        os.path.join(os.getcwd(), 'labels.csv'),
+        save_fn = config.vocab_json_fn
+    )
+
+    simple_decoder = Wav2Vec2CTCTokenizer(config.vocab_json_fn,
+                                          bos_token = '<s>',
+                                          eos_id = '</s>',
+                                          pad_id = '[pad]',
+                                          word_delimiter_token = ' ')
 
     print('load vocab success')
+    print('len of vocab : ', len(vocab))
+    print("black token id : ", vocab.blank_id)
     print('-'*100)
     print('building model')
 
@@ -427,16 +502,18 @@ if __name__ == '__main__':
         # train_sampler = UniformLengthBatchingSampler(train_dataset, batch_size=config.batch_size)
         # valid_sampler = UniformLengthBatchingSampler(valid_dataset, batch_size=config.batch_size)
         train_sampler = SequentialSampler(train_dataset)
-        # valid_sampler = SequentialSampler(valid_dataset)
+        # batch_sampler = BatchSampler(train_sampler, batch_size=config.batch_size, drop_last=True)
 
 
         train_loader = DataLoader(
             train_dataset,
+            # sampler = train_sampler,
             sampler = train_sampler,
             batch_size=config.batch_size,
             # shuffle=True,
             collate_fn=CustomPadFill(0,config),            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
             num_workers=config.num_workers,
+            # num_workers=0,
             drop_last=True
         )
 
@@ -446,6 +523,7 @@ if __name__ == '__main__':
             # shuffle=True,
             collate_fn=CustomPadFill(0, config),
             num_workers=config.num_workers,
+            # num_workers=0,
             drop_last=True
         )
 
@@ -470,10 +548,23 @@ if __name__ == '__main__':
             lr_scheduler = get_lr_scheduler(config, optimizer, len(train_dataset)) # learning scheduler 적용했네.
             optimizer = Optimizer(optimizer, lr_scheduler, int(len(train_dataset)*config.num_epochs), config.max_grad_norm)
 
-        criterion = get_criterion(config, vocab) # CTC loss
-
+        criterion = get_criterion(config, vocab, if_add_blank_id=False) # CTC loss
 
         train_begin_time = time.time()
+
+
+
+
+
+        cer_metric = load("cer")
+
+
+
+
+
+
+
+
 
 
         for epoch in range(config.num_epochs):
@@ -491,7 +582,8 @@ if __name__ == '__main__':
                 'wer_metric',
                 train_begin_time,
                 device,
-                vocab=vocab
+                vocab=vocab,
+                decoder=simple_decoder
             )
 
             print('[INFO] Epoch %d (Training) Loss %0.4f CER %0.4f' % (epoch, train_loss, train_cer))
@@ -509,7 +601,8 @@ if __name__ == '__main__':
                 'wer_metric',
                 train_begin_time,
                 device,
-                vocab=vocab
+                vocab=vocab,
+                decoder=simple_decoder
             )
 
             print('[INFO] Epoch %d (Validation) Loss %0.4f  CER %0.4f' % (epoch, valid_loss, valid_cer))
@@ -531,4 +624,9 @@ if __name__ == '__main__':
 
             torch.cuda.empty_cache()
             print(f'[INFO] epoch {epoch} is done')
+            if config.version == 'POC':
+                out = custom_oneToken_infer_for_testing(model, df.iloc[0]['filename'], _, config)
+                print(out)
+                import time
+                time.sleep(600)
         print('[INFO] train process is done')

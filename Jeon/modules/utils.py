@@ -192,8 +192,15 @@ def get_optimizer(model: nn.Module, config):
             lr=config.init_lr,
         )
 
-def get_criterion(config, vocab: Vocabulary) -> nn.Module:
+def get_criterion(config, vocab: Vocabulary, if_add_blank_id=False) -> nn.Module:
 
-    criterion = nn.CTCLoss(blank=vocab.blank_id, reduction=config.reduction, zero_infinity=True)
+    if if_add_blank_id:
+        vocab_id = vocab.blank_id
+    else:
+        vocab_id = vocab.pad_id
+    print("-"*100)
+    print(vocab_id)
+        
+    criterion = nn.CTCLoss(blank=vocab_id, reduction=config.reduction, zero_infinity=True)
 
     return criterion

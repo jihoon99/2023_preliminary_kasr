@@ -19,6 +19,9 @@ setup(
         'torchaudio==0.6.0',
         'pydub',
         'glob2',
+        'transformers',
+        'evaluate',
+        'jiwer'
     ],
 )
 

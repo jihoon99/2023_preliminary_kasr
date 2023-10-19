@@ -16,6 +16,7 @@ from modules.data import (
     remove_noise_data,
     detect_silence,
 )
+from transformers import Wav2Vec2CTCTokenizer
 
 
 
@@ -51,6 +52,18 @@ def single_infer(model, audio_path):
     return sentence
 
 
+
+def load_simple_decoder(
+        json_fn = os.path.join(os.getcwd(), 'unit2id.json')
+        ):
+    simple_decoder = Wav2Vec2CTCTokenizer(json_fn,
+                                          bos_token = '<s>',
+                                          eos_id = '</s>',
+                                          pad_id = '[pad]',
+                                          word_delimiter_token = ' ')
+    return simple_decoder
+
+
 def custom_oneToken_infer(model, features, feature_lengths, targets, vocab):
     model.eval()
     if next(model.parameters()).is_cuda == False:
@@ -81,11 +94,30 @@ def custom_oneToken_infer_for_testing(model, audio_path, vocab, config):
     device = 'cuda'
 
     feature = inference_wav2image_tensor(audio_path, config)
-    input_length = torch.LongTensor([len(feature)])
+    input_length = torch.IntTensor([feature.shape[-1]]).to(device)
 
-    y_hats, _ = model(feature.unsqueeze(0).to(device), input_length)
-    sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
+    print(feature.unsqueeze(0).transpose(1,2).shape, input_length.shape, input_length)
+    outputs, _ = model(feature.unsqueeze(0).transpose(1,2).to(device), input_length)
+
+    y_hats = outputs.max(-1)[1]
+    print(y_hats)
+    decoder = load_simple_decoder(config.vocab_json_fn)
+    sentence = decoder.decode(y_hats[0])
+    # sentence = vocab.label_to_string(y_hats.cpu().detach().numpy())
+    print('single infer done')
     return sentence
+
+def custom_oneToken_infer_for_testing_dataloader(model, features, feature_lens, config):
+    if next(model.parameters()).is_cuda == False:
+        model.to('cuda')
+    model.eval()
+    device = 'cuda'
+
+    output, _ = model(features.transpose(1,2).to(device),feature_lens)
+    y_hats = output.max(-1)[1]
+    decoder = load_simple_decoder(config.vocab_json_fn)
+    sentences = [decoder.decode(_y_hat) for _y_hat in y_hats]
+    return sentences
 
 
 

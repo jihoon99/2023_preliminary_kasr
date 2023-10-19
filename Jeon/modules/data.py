@@ -68,6 +68,38 @@ class CustomPadFill():
         for idx, target in enumerate(targets):
             zero_targets[idx].narrow(0,0,len(target)).copy_(torch.LongTensor(target))
         return zero_targets
+    
+    def shuffle(self, a,b,c,d):
+        """ Shuffle dataset """
+        tmp = list(zip(a,b,c,d))
+        random.shuffle(tmp)
+        a,b,c,d = zip(*tmp)
+        a = torch.cat(a, dim=0)
+        b = torch.cat(b, dim=0).long()
+        c = torch.cat(c, dim=0).long()
+        d = torch.cat(d, dim=0).long()
+        return a,b,c,d
+    
+    def shuffle_1(self, features, targets, feature_len, target_len):
+        idx = list(range(features.shape[0]))
+        random.shuffle(idx)
+
+        new_features = []
+        new_targets = []
+        new_target_len = []
+        new_feature_len = []
+
+        for _idx in idx:
+            new_features += [features[_idx].unsqueeze(0)]
+            new_targets += [targets[_idx].unsqueeze(0)]
+            new_target_len += [target_len[_idx]]
+            new_feature_len += [feature_len[_idx]]
+
+        features = torch.cat(new_features, dim=0)
+        targets = torch.cat(new_targets, dim=0).long()
+        target_len = torch.IntTensor(new_target_len)
+        feature_len = torch.IntTensor(new_feature_len)
+        return features, targets, feature_len, target_len 
 
     def __call__(self, bs):
         
@@ -94,7 +126,6 @@ class CustomPadFill():
         #targets = torch.cat(targets, dim=0)
         features = torch.cat(features, dim=0).transpose(-1,-2)
 
-
         ### 제발 되라...
         final_feature_len = []
         for _f in feature_len:
@@ -104,6 +135,8 @@ class CustomPadFill():
                 final_feature_len += [_f]
         feature_len = torch.IntTensor(final_feature_len)
         target_len = torch.IntTensor(target_len)
+
+        features, targets, feature_len, target_len = self.shuffle_1(features, targets, feature_len, target_len)
 
         return features, targets, feature_len, target_len
 
@@ -709,6 +742,93 @@ def collate_fn(batch):
         return seqs, targets, seq_lengths, target_lengths
     except Exception as e:
         print(e)
+
+
+class inferDataset(Dataset):
+
+    def __init__(self, df):
+        self.df = df
+
+    def __len__(self):
+        return len(self.df)
+    
+    def wav2image_tensor(self, path):
+        audio, sr = librosa.load(path, sr=self.config.sample_rate)
+        audio, _ = librosa.effects.trim(audio)
+
+        if self.config.remove_noise:
+            audio = remove_noise_data(audio)
+
+        if self.config.del_silence:
+            audio = detect_silence(
+                audio,
+                audio_threshold=self.config.audio_threshold,
+                min_silence_len=self.config.min_silence_len,
+                ratio = self.config.sample_rate,
+                make_silence_len=self.config.make_silence_len
+                )
+        ######### 하드 코딩 된 부분들
+        mfcc = librosa.feature.mfcc(
+            y = audio, 
+            sr=self.config.sample_rate, 
+            n_mfcc=self.config.n_mels, 
+            n_fft=400, 
+            hop_length=160
+        )
+
+        # max_len = 1000
+        mfcc = sklearn.preprocessing.scale(mfcc, axis=1)
+        mfcc = torch.tensor(mfcc, dtype=torch.float)
+        return mfcc
+    
+    def __getitem__(self, idx):
+        semi_df = self.df.iloc[idx]
+        _file_path = semi_df['filename']
+        mfccs = self.wav2image_tensor(
+                _file_path
+                )
+        
+        return mfccs, _file_path
+
+
+class inferCustomPadFill():
+    def __init__(self, padding_token, config):
+        self.config = config
+        self.padding_token = padding_token
+
+    def custom_feature_padding(self, feature, max_len, current_len):
+        template = nn.ZeroPad2d((0,max_len-current_len,0,0))
+        return template(feature)
+    
+    def __call__(self, bs):
+        features = []
+        feature_len = []
+        filename_ls = []
+
+        for feature, filename in bs:
+            # target = torch.tensor(target).long()
+            # feature_len += [min(feature.shape[-1], self.config.mfcc_max_len)]
+            feature_len += [feature.shape[-1]]
+            filename_ls += [filename]
+
+        max_feature_len = max(feature_len)
+
+        for (feature, filename), current_feature_len in zip(bs, feature_len):
+            #targets += [self.custom_target_padding1(target, max_target_len, current_target_len)]
+            features += [self.custom_feature_padding(feature, max_feature_len, current_feature_len).unsqueeze(0)]
+
+        #targets = torch.cat(targets, dim=0)
+        features = torch.cat(features, dim=0).transpose(-1,-2)
+
+        ### 제발 되라...
+
+        feature_len = torch.IntTensor(feature_len)
+
+        #features, targets, feature_len, target_len = self.shuffle(features, targets, feature_len, target_len)
+
+        return features, filename_ls, feature_len
+    
+
 
 
 if __name__ == "__main__":
