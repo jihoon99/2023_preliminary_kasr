@@ -30,6 +30,7 @@ from modules.model.conformer.model import Conformer
 
 from modules.vocab import KoreanSpeechVocabulary
 from modules.data import (
+    BucketBatchSampler,
     UniformLengthBatchingSampler,
     split_dataset, 
     split_dataset_1,
@@ -502,19 +503,25 @@ if __name__ == '__main__':
         # train_sampler = UniformLengthBatchingSampler(train_dataset, batch_size=config.batch_size)
         # valid_sampler = UniformLengthBatchingSampler(valid_dataset, batch_size=config.batch_size)
         train_sampler = SequentialSampler(train_dataset)
+        # print("train_sampler", list(train_sampler)[:3])
+
         # batch_sampler = BatchSampler(train_sampler, batch_size=config.batch_size, drop_last=True)
+        batch_sampler = BucketBatchSampler(train_sampler, batch_size=config.batch_size, drop_last=True)
+        # DataLoader에서 제외 : batch_size, shuffle, sampler, and drop_last.
+        print("-----BucketBatchSampler 100개", list(batch_sampler)[:100])
+        # raise Exception('여기까지 테스트!----------------------------------------')
 
 
         train_loader = DataLoader(
             train_dataset,
             # sampler = train_sampler,
-            sampler = train_sampler,
-            batch_size=config.batch_size,
+            batch_sampler = batch_sampler,
+            # batch_size=config.batch_size,
             # shuffle=True,
             collate_fn=CustomPadFill(0,config),            # 배치 내에서 max값에 padding을 해줬는데, for 사용함 : 속도 느림. torch.pad(?) 사용하자. 적극적으로 broadcasting사용 -> rainism repository : asfl kaggle : 참고
             num_workers=config.num_workers,
             # num_workers=0,
-            drop_last=True
+            # drop_last=True
         )
 
         valid_loader = DataLoader(
@@ -573,15 +580,15 @@ if __name__ == '__main__':
             # train
 
             model, train_loss, train_cer = training(
-                config,
-                train_loader,
-                optimizer,
-                model,
-                criterion,
-                cer_metric,
-                'wer_metric',
-                train_begin_time,
-                device,
+                config = config,
+                dataloader = train_loader,
+                optimizer = optimizer,
+                model = model,
+                criterion = criterion,
+                cer_metric= cer_metric,
+                wer_metric = 'wer_metric',
+                train_begin_time=train_begin_time,
+                device=device,
                 vocab=vocab,
                 decoder=simple_decoder
             )
@@ -591,16 +598,16 @@ if __name__ == '__main__':
             valid_begin_time = time.time()
 
             # valid
-            _, valid_loss, valid_cer = validating(
-                config,
-                valid_loader,
-                optimizer,
-                model,
-                criterion,
-                cer_metric,
-                'wer_metric',
-                train_begin_time,
-                device,
+            model, valid_loss, valid_cer = validating(
+                config = config,
+                dataloader=valid_loader,
+                optimizer=optimizer,
+                model=model,
+                criterion=criterion,
+                cer_metric=cer_metric,
+                wer_metric='wer_metric',
+                train_begin_time=train_begin_time,
+                device=device,
                 vocab=vocab,
                 decoder=simple_decoder
             )
