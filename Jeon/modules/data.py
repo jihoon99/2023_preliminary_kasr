@@ -830,6 +830,61 @@ class inferCustomPadFill():
     
 
 
+import math
+from torch.utils.data.sampler import Sampler
+from torch.utils.data.sampler import BatchSampler
+from torch.utils.data.sampler import SubsetRandomSampler
+from torch.utils.data.sampler import SequentialSampler
+
+
+def identity(x):
+    return x
+
+
+class SortedSampler(Sampler):
+    def __init__(self, data, sort_key=identity):
+        super().__init__(data)
+        self.data = data
+        self.sort_key = sort_key
+        zip_ = [(i, self.sort_key(row)) for i, row in enumerate(self.data)]
+        zip_ = sorted(zip_, key=lambda r: r[1])
+        self.sorted_indexes = [item[0] for item in zip_]
+
+    def __iter__(self):
+        return iter(self.sorted_indexes)
+
+    def __len__(self):
+        return len(self.data)
+
+
+
+class BucketBatchSampler(BatchSampler):
+    def __init__(self,
+                 sampler,
+                 batch_size,
+                 drop_last,
+                 sort_key=identity,
+                 bucket_size_multiplier=100):
+        super().__init__(sampler, batch_size, drop_last)
+        self.sort_key = sort_key
+        _bucket_size = batch_size * bucket_size_multiplier
+        if hasattr(sampler, "__len__"):
+            _bucket_size = min(_bucket_size, len(sampler))
+        self.bucket_sampler = BatchSampler(sampler, _bucket_size, False)
+
+    def __iter__(self):
+        for bucket in self.bucket_sampler:
+            sorted_sampler = SortedSampler(bucket, self.sort_key)
+            for batch in SubsetRandomSampler(
+                    list(BatchSampler(sorted_sampler, self.batch_size, self.drop_last))):
+                yield [bucket[i] for i in batch]
+
+    def __len__(self):
+        if self.drop_last:
+            return len(self.sampler) // self.batch_size
+        else:
+            return math.ceil(len(self.sampler) / self.batch_size)
+        
 
 if __name__ == "__main__":
     pass
